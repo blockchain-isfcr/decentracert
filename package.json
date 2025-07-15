@@ -4,13 +4,13 @@
   "description": "Certificate NFT System for University Clubs & Events with Merkle-based claiming",
   "main": "index.js",
   "scripts": {
-    "start": "npm run build && concurrently \"npm run server\" \"craco start\"",
+    "start": "concurrently -n \"SERVER,CLIENT\" -c \"green,blue\" \"npm run server\" \"craco start\"",
     "build": "craco build",
     "test": "craco test",
     "eject": "react-scripts eject",
     "deploy": "npx hardhat run scripts/deploy.js --network sepolia",
     "server": "node server.js",
-    "dev": "concurrently \"npm run server\" \"npm run start\""
+    "dev": "concurrently \"npm run server\" \"craco start\""
   },
   "keywords": [
     "blockchain",
@@ -53,6 +53,7 @@
     "stream-browserify": "^3.0.0",
     "util": "^0.12.5"
   },
+  "proxy": "http://localhost:3001",
   "browserslist": {
     "production": [
       ">0.2%",

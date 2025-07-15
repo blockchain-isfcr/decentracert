@@ -194,11 +194,39 @@ export const deployCertificateContractUltraLow = async (eventDetails, merkleRoot
     console.log('Event details:', eventDetails);
     console.log('Merkle root:', merkleRoot);
 
-    // Check signer and balance
-    const signerAddress = await signer.getAddress();
+    // Check signer and balance - handle different signer types
+    let signerAddress;
+    try {
+      if (signer.getAddress) {
+        signerAddress = await signer.getAddress();
+      } else if (signer.address) {
+        signerAddress = signer.address;
+      } else if (signer.getAddress && typeof signer.getAddress === 'function') {
+        signerAddress = await signer.getAddress();
+      } else {
+        throw new Error('Invalid signer object - no address method found');
+      }
+    } catch (error) {
+      console.error('Error getting signer address:', error);
+      throw new Error('Failed to get signer address. Please check your wallet connection.');
+    }
+    
     console.log('Signer address:', signerAddress);
 
-    const balance = await signer.getBalance();
+    let balance;
+    try {
+      if (signer.getBalance) {
+        balance = await signer.getBalance();
+      } else if (signer.provider && signer.provider.getBalance) {
+        balance = await signer.provider.getBalance(signerAddress);
+      } else {
+        throw new Error('Cannot get balance - no balance method found');
+      }
+    } catch (error) {
+      console.error('Error getting balance:', error);
+      throw new Error('Failed to get account balance. Please check your wallet connection.');
+    }
+    
     console.log('Balance:', ethers.utils.formatEther(balance), 'ETH');
 
     if (balance.isZero()) {
@@ -274,8 +302,23 @@ export const deployCertificateContractOptimized = async (eventDetails, merkleRoo
     console.log('Event details:', eventDetails);
     console.log('Merkle root:', merkleRoot);
 
-    // Check signer
-    const signerAddress = await signer.getAddress();
+    // Check signer - handle different signer types
+    let signerAddress;
+    try {
+      if (signer.getAddress) {
+        signerAddress = await signer.getAddress();
+      } else if (signer.address) {
+        signerAddress = signer.address;
+      } else if (signer.getAddress && typeof signer.getAddress === 'function') {
+        signerAddress = await signer.getAddress();
+      } else {
+        throw new Error('Invalid signer object - no address method found');
+      }
+    } catch (error) {
+      console.error('Error getting signer address:', error);
+      throw new Error('Failed to get signer address. Please check your wallet connection.');
+    }
+    
     console.log('Signer address:', signerAddress);
 
     // Check network

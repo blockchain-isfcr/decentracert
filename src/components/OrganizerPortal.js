@@ -334,21 +334,29 @@ The contract is deployed and working. You can proceed with certificate distribut
       
       if (deploymentMode === 'cheap') {
         contractAddress = await deployCertificateContractUltraLow(
-          signer,
-          eventName,
-          eventSymbol,
+          {
+            name: eventName,
+            symbol: eventSymbol,
+            eventName: eventName,
+            eventDescription: eventDescription,
+            eventDate: eventDate,
+            eventImageURI: `ipfs://${metadataHash}`
+          },
           merkleRoot,
-          `ipfs://${metadataHash}`,
-          gasPrice
+          signer
         );
       } else {
         contractAddress = await deployCertificateContractOptimized(
-          signer,
-          eventName,
-          eventSymbol,
+          {
+            name: eventName,
+            symbol: eventSymbol,
+            eventName: eventName,
+            eventDescription: eventDescription,
+            eventDate: eventDate,
+            eventImageURI: `ipfs://${metadataHash}`
+          },
           merkleRoot,
-          `ipfs://${metadataHash}`,
-          gasPrice
+          signer
         );
       }
 
@@ -482,54 +490,25 @@ A comprehensive data file has been downloaded with all the information needed fo
       setLoading(true);
       setError('');
 
-        // Upload AI-generated image to IPFS
-      const imageHash = await uploadAIImageToPinata(certificateData.imageDataUrl, certificateData.eventName);
-        setUploadedImageHash(imageHash);
+      console.log('🎉 AI Certificate data received:', certificateData);
 
-      // Create metadata for AI certificate
-        const metadata = {
-        name: certificateData.eventName,
-        description: certificateData.description,
-        image: `https://gateway.pinata.cloud/ipfs/${imageHash}`,
-          external_url: `https://gateway.pinata.cloud/ipfs/${imageHash}`,
-          attributes: [
-            {
-            trait_type: "Event",
-            value: certificateData.eventName
-            },
-            {
-            trait_type: "Date",
-            value: certificateData.eventDate
-            },
-            {
-            trait_type: "Issuer",
-            value: account
-            },
-            {
-            trait_type: "Certificate Type",
-            value: "AI-Generated Soulbound"
-            },
-            {
-            trait_type: "AI Generated",
-            value: "Yes"
-            }
-          ]
-        };
-
-        // Upload metadata to IPFS
-      const metadataHash = await uploadCustomMetadataToPinata(metadata, certificateData.eventName);
-        setMetadataHash(metadataHash);
+      // The AI certificate generator has already uploaded everything to IPFS
+      // We just need to extract the data and update our form
+      if (certificateData.ipfs && certificateData.ipfs.ipfsHash) {
+        setUploadedImageHash(certificateData.ipfs.ipfsHash);
+        setMetadataHash(certificateData.ipfs.ipfsHash);
+      }
 
       // Update form fields with AI-generated data
-      setEventName(certificateData.eventName);
-      setEventSymbol(certificateData.eventSymbol);
-      setEventDescription(certificateData.description);
-      setEventDate(certificateData.eventDate);
-      setImagePreview(certificateData.imageDataUrl);
+      setEventName(certificateData.eventName || certificateData.design?.metadata?.eventName);
+      setEventSymbol(certificateData.eventSymbol || 'AI' + Date.now().toString().slice(-4));
+      setEventDescription(certificateData.description || certificateData.design?.metadata?.description);
+      setEventDate(certificateData.eventDate || new Date().toISOString().split('T')[0]);
+      setImagePreview(certificateData.design?.imageUrl || certificateData.imageDataUrl);
 
-      setSuccessMsg('🎉 AI Certificate generated and uploaded successfully!');
-        setActiveTab('create');
-      setStep(1);
+      setSuccessMsg('🎉 AI Certificate generated and uploaded successfully! Ready to add participant addresses.');
+      setActiveTab('create');
+      setStep(2); // Skip to participant addresses step
     } catch (error) {
       console.error('Error handling AI certificate:', error);
       setError('Failed to process AI certificate: ' + error.message);
@@ -696,7 +675,7 @@ A comprehensive data file has been downloaded with all the information needed fo
                 <small className={step >= 4 ? 'text-primary fw-bold' : ''}>Deploy Contract</small>
               </div>
 
-              {uploadedImageHash && (
+              {uploadedImageHash && activeTab === 'ai-generator' && (
                 <div className="mt-2">
                   <small className="text-success">
                     🤖 AI Certificate Generated - Image upload step skipped
