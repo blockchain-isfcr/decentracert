@@ -79,6 +79,7 @@ The contract is deployed and working. You can proceed with certificate distribut
   const [currentGasPrice, setCurrentGasPrice] = useState(null);
   const [merkleRoot, setMerkleRoot] = useState('');
   const [deployedContract, setDeployedContract] = useState('');
+  const [networkName, setNetworkName] = useState('');
 
   // UI state
   const [loading, setLoading] = useState(false);
@@ -330,10 +331,14 @@ The contract is deployed and working. You can proceed with certificate distribut
       // Check gas prices
       const gasPrice = await checkGasPrices();
       
-      let contractAddress;
+      // Get network information
+      const network = await signer.provider.getNetwork();
+      setNetworkName(network.name || 'Unknown');
+      
+      let deployedContract;
       
       if (deploymentMode === 'cheap') {
-        contractAddress = await deployCertificateContractUltraLow(
+        deployedContract = await deployCertificateContractUltraLow(
           {
             name: eventName,
             symbol: eventSymbol,
@@ -346,7 +351,7 @@ The contract is deployed and working. You can proceed with certificate distribut
           signer
         );
       } else {
-        contractAddress = await deployCertificateContractOptimized(
+        deployedContract = await deployCertificateContractOptimized(
           {
             name: eventName,
             symbol: eventSymbol,
@@ -360,6 +365,7 @@ The contract is deployed and working. You can proceed with certificate distribut
         );
       }
 
+      const contractAddress = deployedContract.address;
       setDeployedContract(contractAddress);
       setContractAddress(contractAddress);
 
@@ -371,17 +377,18 @@ The contract is deployed and working. You can proceed with certificate distribut
             name: eventName,
             symbol: eventSymbol,
             description: eventDescription,
-                date: eventDate
-              },
-                merkleRoot: merkleRoot,
+            date: eventDate
+          },
+          merkleRoot: merkleRoot,
           merkleProofs: merkleProofs,
-                tokenURI: `ipfs://${metadataHash}`,
-                imageHash: uploadedImageHash,
+          tokenURI: `ipfs://${metadataHash}`,
+          imageHash: uploadedImageHash,
           metadataHash: metadataHash,
           deploymentMode: deploymentMode,
           gasPrice: gasPrice,
           deployedAt: new Date().toISOString(),
-          issuer: account
+          issuer: account,
+          network: networkName
         };
 
         const jsonData = JSON.stringify(comprehensiveData, null, 2);
@@ -499,12 +506,21 @@ A comprehensive data file has been downloaded with all the information needed fo
         setMetadataHash(certificateData.ipfs.ipfsHash);
       }
 
+      // Extract event data from the correct location in the certificate data structure
+      const eventData = certificateData.metadata?.certificate_data?.event || certificateData.design?.metadata?.certificate_data?.event || {};
+      
       // Update form fields with AI-generated data
-      setEventName(certificateData.eventName || certificateData.design?.metadata?.eventName);
+      setEventName(eventData.name || certificateData.design?.metadata?.eventName || 'AI Event');
       setEventSymbol(certificateData.eventSymbol || 'AI' + Date.now().toString().slice(-4));
-      setEventDescription(certificateData.description || certificateData.design?.metadata?.description);
-      setEventDate(certificateData.eventDate || new Date().toISOString().split('T')[0]);
+      setEventDescription(eventData.description || certificateData.design?.metadata?.description || 'AI Generated Certificate');
+      setEventDate(eventData.date || certificateData.design?.metadata?.eventDate || new Date().toISOString().split('T')[0]);
       setImagePreview(certificateData.design?.imageUrl || certificateData.imageDataUrl);
+
+      console.log('📝 Extracted event data:', {
+        name: eventData.name,
+        description: eventData.description,
+        date: eventData.date
+      });
 
       setSuccessMsg('🎉 AI Certificate generated and uploaded successfully! Ready to add participant addresses.');
       setActiveTab('create');
@@ -537,12 +553,17 @@ A comprehensive data file has been downloaded with all the information needed fo
 
     try {
       if (merkleRoot) {
-        await updateMerkleRoot(signer, contractAddress, merkleRoot);
+        await updateMerkleRoot(contractAddress, merkleRoot, signer);
         setSuccessMsg('Merkle root updated successfully!');
       }
 
       if (eventName && eventSymbol && eventDescription && eventDate) {
-        await updateEventDetails(signer, contractAddress, eventName, eventSymbol, eventDescription, eventDate);
+        await updateEventDetails(contractAddress, {
+          eventName,
+          eventDescription,
+          eventDate,
+          eventImageURI: `ipfs://${metadataHash}`
+        }, signer);
         setSuccessMsg(prevMsg => prevMsg + '\nEvent details updated successfully!');
       }
     } catch (error) {
@@ -818,12 +839,23 @@ A comprehensive data file has been downloaded with all the information needed fo
                   <div className="alert alert-success mb-4">
                     <div className="row">
                       <div className="col-md-4">
-                        <img
-                          src={imagePreview}
-                          alt="AI Generated Certificate"
-                          className="img-fluid rounded border"
-                          style={{maxHeight: '150px', objectFit: 'cover'}}
-                        />
+                        {imagePreview.startsWith('data:image') ? (
+                          <div className="text-center p-3 border rounded bg-light">
+                            <div className="mb-2">
+                              <i className="fas fa-image text-primary" style={{fontSize: '2rem'}}></i>
+                            </div>
+                            <small className="text-muted">AI Generated Certificate</small>
+                            <br />
+                            <small className="text-success">✅ Design Ready</small>
+                          </div>
+                        ) : (
+                          <img
+                            src={imagePreview}
+                            alt="AI Generated Certificate"
+                            className="img-fluid rounded border"
+                            style={{maxHeight: '150px', objectFit: 'cover'}}
+                          />
+                        )}
                       </div>
                       <div className="col-md-8">
                         <h6>🎉 AI Certificate Generated Successfully!</h6>
@@ -993,12 +1025,25 @@ A comprehensive data file has been downloaded with all the information needed fo
                     <div className="mb-3">
                       <label className="form-label">Preview</label>
                       <div className="border p-2 text-center">
-                        <img 
-                          src={imagePreview} 
-                          alt="Certificate Preview" 
-                          className="img-fluid" 
-                          style={{ maxHeight: '300px' }} 
-                        />
+                        {imagePreview.startsWith('data:image') ? (
+                          <div className="p-4 bg-light rounded">
+                            <div className="mb-2">
+                              <i className="fas fa-image text-primary" style={{fontSize: '3rem'}}></i>
+                            </div>
+                            <div className="text-muted">
+                              <strong>AI Generated Certificate</strong>
+                              <br />
+                              <small>Design ready for deployment</small>
+                            </div>
+                          </div>
+                        ) : (
+                          <img 
+                            src={imagePreview} 
+                            alt="Certificate Preview" 
+                            className="img-fluid" 
+                            style={{ maxHeight: '300px' }} 
+                          />
+                        )}
                       </div>
                     </div>
                   )}

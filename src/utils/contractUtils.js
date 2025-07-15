@@ -83,15 +83,9 @@ export const hasAddressClaimed = async (contractAddress, address, provider) => {
  */
 export const isAddressEligible = async (contractAddress, address, merkleProof, provider) => {
   try {
-    // Try optimized contract first
-    try {
-      const optimizedContract = new ethers.Contract(contractAddress, CertificateNFTOptimized.abi, provider);
-      return await optimizedContract.isEligible(address, merkleProof);
-    } catch (optimizedError) {
-      // Fallback to original contract
-      const contract = getCertificateContractReadOnly(contractAddress, provider);
-      return await contract.isEligible(address, merkleProof);
-    }
+    // Use the standard contract
+    const contract = getCertificateContractReadOnly(contractAddress, provider);
+    return await contract.isEligible(address, merkleProof);
   } catch (error) {
     console.error('Error checking if address is eligible:', error);
     throw error;
@@ -108,34 +102,47 @@ export const isAddressEligible = async (contractAddress, address, merkleProof, p
  */
 export const claimCertificate = async (contractAddress, merkleProof, tokenURI, signer) => {
   try {
-    // Try optimized contract first (no tokenURI parameter)
-    try {
-      const optimizedContract = new ethers.Contract(contractAddress, CertificateNFTOptimized.abi, signer);
+    console.log('🔍 Claiming certificate with parameters:');
+    console.log('Contract address:', contractAddress);
+    console.log('Merkle proof:', merkleProof);
+    console.log('Token URI:', tokenURI);
+    console.log('Signer address:', await signer.getAddress());
 
-      // Estimate gas for optimized contract
-      const gasEstimate = await optimizedContract.estimateGas.claimCertificate(merkleProof);
-      const gasLimit = gasEstimate.mul(120).div(100); // Add 20%
+    // Use the standard contract
+    const contract = getCertificateContract(contractAddress, signer);
+    console.log('✅ Contract instance created successfully');
 
-      // Send transaction to optimized contract
-      const tx = await optimizedContract.claimCertificate(merkleProof, { gasLimit });
-      const receipt = await tx.wait();
-      return receipt;
-    } catch (optimizedError) {
-      console.log('Optimized contract failed, trying original contract...');
+    console.log('⛽ Estimating gas...');
+    const gasEstimate = await contract.estimateGas.claimCertificate(merkleProof, tokenURI);
+    console.log('Gas estimate:', gasEstimate.toString());
+    
+    const gasLimit = gasEstimate.mul(120).div(100); // Add 20%
+    console.log('Gas limit (with 20% buffer):', gasLimit.toString());
 
-      // Fallback to original contract
-      const contract = getCertificateContract(contractAddress, signer);
+    console.log('🚀 Sending transaction...');
+    const tx = await contract.claimCertificate(merkleProof, tokenURI, { gasLimit });
+    console.log('Transaction sent:', tx.hash);
 
-      const gasEstimate = await contract.estimateGas.claimCertificate(merkleProof, tokenURI);
-      const gasLimit = gasEstimate.mul(120).div(100); // Add 20%
-
-      const tx = await contract.claimCertificate(merkleProof, tokenURI, { gasLimit });
-      const receipt = await tx.wait();
-      return receipt;
-    }
+    console.log('⏳ Waiting for confirmation...');
+    const receipt = await tx.wait();
+    console.log('✅ Transaction confirmed:', receipt);
+    
+    return receipt;
   } catch (error) {
-    console.error('Error claiming certificate:', error);
-    throw error;
+    console.error('❌ Error claiming certificate:', error);
+    
+    // Provide more specific error messages
+    if (error.code === 4001) {
+      throw new Error('Transaction was rejected by user.');
+    } else if (error.message && error.message.includes('already claimed')) {
+      throw new Error('You have already claimed this certificate.');
+    } else if (error.message && error.message.includes('Invalid Merkle proof')) {
+      throw new Error('Invalid Merkle proof. Please check your proof and try again.');
+    } else if (error.message && error.message.includes('Contract address and signer are required')) {
+      throw new Error('Invalid contract address or wallet connection. Please check your inputs.');
+    } else {
+      throw error;
+    }
   }
 };
 
@@ -288,7 +295,14 @@ export const deployCertificateContractUltraLow = async (eventDetails, merkleRoot
     }
 
     console.log('Ultra-low gas contract deployed successfully at:', contract.address);
-    return contract;
+    return {
+      address: contract.address,
+      deployTransaction: {
+        hash: contract.deployTransaction.hash,
+        gasLimit: contract.deployTransaction.gasLimit?.toString(),
+        gasPrice: contract.deployTransaction.gasPrice?.toString()
+      }
+    };
 
   } catch (error) {
     console.error('Ultra-low gas deployment failed:', error);
@@ -448,7 +462,14 @@ export const deployCertificateContractOptimized = async (eventDetails, merkleRoo
     }
 
     console.log('Gas-optimized contract deployed successfully at:', contract.address);
-    return contract;
+    return {
+      address: contract.address,
+      deployTransaction: {
+        hash: contract.deployTransaction.hash,
+        gasLimit: contract.deployTransaction.gasLimit?.toString(),
+        gasPrice: contract.deployTransaction.gasPrice?.toString()
+      }
+    };
 
   } catch (error) {
     console.error('Error deploying gas-optimized contract:', error);
@@ -535,7 +556,14 @@ export const deployCertificateContract = async (eventDetails, merkleRoot, signer
     await contract.deployed();
     console.log('Contract deployed successfully at:', contract.address);
 
-    return contract;
+    return {
+      address: contract.address,
+      deployTransaction: {
+        hash: contract.deployTransaction.hash,
+        gasLimit: contract.deployTransaction.gasLimit?.toString(),
+        gasPrice: contract.deployTransaction.gasPrice?.toString()
+      }
+    };
   } catch (error) {
     console.error('Error deploying certificate contract:', error);
 

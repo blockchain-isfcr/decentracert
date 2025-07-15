@@ -1865,4 +1865,151 @@ html, body {
 .progress-section small.text-primary {
   color: var(--primary-color);
   font-weight: 600;
+}
+
+/* Step Indicator Styles */
+.step-indicator {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  position: relative;
+  padding: 0 1rem;
+}
+
+.step-indicator::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-50%);
+  z-index: 1;
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 2;
+  transition: var(--transition);
+}
+
+.step-number {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: var(--text-secondary);
+  transition: var(--transition);
+  margin-bottom: 0.5rem;
+}
+
+.step.active .step-number {
+  background: var(--primary-gradient);
+  border-color: var(--primary-color);
+  color: white;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+}
+
+.step-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-align: center;
+  font-weight: 500;
+  transition: var(--transition);
+}
+
+.step.active .step-label {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Step-specific styles */
+.step-title {
+  color: var(--text-primary);
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.step-description {
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.tokenuri-section,
+.tokenuri-details-section {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+  margin-top: 1rem;
+}
+
+.details-title {
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.details-info {
+  color: var(--text-secondary);
+}
+
+.details-info p {
+  margin-bottom: 0.5rem;
+}
+
+.details-info a {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+.details-info a:hover {
+  text-decoration: underline;
+}
+
+.details-info ul {
+  margin-top: 0.5rem;
+  padding-left: 1.5rem;
+}
+
+.details-info li {
+  margin-bottom: 0.25rem;
+}
+
+/* Responsive step indicator */
+@media (max-width: 768px) {
+  .step-indicator {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .step-indicator::before {
+    display: none;
+  }
+  
+  .step {
+    flex-direction: row;
+    gap: 0.5rem;
+  }
+  
+  .step-number {
+    margin-bottom: 0;
+  }
 } 

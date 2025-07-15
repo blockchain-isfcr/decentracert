@@ -30,6 +30,7 @@ const StudentPortal = ({ account, provider, signer, connectWallet }) => {
   const [successMsg, setSuccessMsg] = useState('');
   const [tokenURI, setTokenURI] = useState('');
   const [step, setStep] = useState(1);
+  const [tokenURIDetails, setTokenURIDetails] = useState(null);
 
   // Certificate viewer state
   const [viewerContractAddress, setViewerContractAddress] = useState('');
@@ -242,7 +243,7 @@ const StudentPortal = ({ account, provider, signer, connectWallet }) => {
 
       if (eligible) {
           setIsEligible(true);
-          setSuccessMsg('✅ You are eligible to claim this certificate!');
+          setSuccessMsg('✅ You are eligible to claim this certificate! Please provide the tokenURI in the next step.');
         setStep(2);
       } else {
           setError('❌ You are not eligible for this certificate. Please check your Merkle proof.');
@@ -259,6 +260,63 @@ const StudentPortal = ({ account, provider, signer, connectWallet }) => {
     }
   };
 
+  // Fetch tokenURI details
+  const fetchTokenURIDetails = async (uri) => {
+    try {
+      if (!uri) return null;
+      
+      // Handle IPFS URIs
+      let metadataUrl = uri;
+      if (uri.startsWith('ipfs://')) {
+        const hash = uri.replace('ipfs://', '');
+        metadataUrl = `https://gateway.pinata.cloud/ipfs/${hash}`;
+      }
+      
+      const response = await fetch(metadataUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch metadata: ${response.status}`);
+      }
+      
+      const metadata = await response.json();
+      return metadata;
+    } catch (error) {
+      console.error('Error fetching tokenURI details:', error);
+      return null;
+    }
+  };
+
+  // Handle tokenURI input and fetch details
+  const handleTokenURIInput = async (e) => {
+    e.preventDefault();
+    
+    if (!tokenURI.trim()) {
+      setError('Please enter a valid tokenURI.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSuccessMsg('');
+
+    try {
+      console.log('🔍 Fetching tokenURI details:', tokenURI);
+      const details = await fetchTokenURIDetails(tokenURI);
+      
+      if (details) {
+        setTokenURIDetails(details);
+        setSuccessMsg('✅ TokenURI details fetched successfully! Ready to claim certificate.');
+        setStep(3); // Move to claiming step
+      } else {
+        setError('Failed to fetch tokenURI details. Please check the URI and try again.');
+      }
+    } catch (error) {
+      console.error('Error processing tokenURI:', error);
+      setError('Failed to process tokenURI. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Handle certificate claiming
   const handleClaimCertificate = async (e) => {
     e.preventDefault();
@@ -268,8 +326,8 @@ const StudentPortal = ({ account, provider, signer, connectWallet }) => {
       return;
     }
 
-    if (!contractAddress || !merkleProof) {
-      setError('Please complete the verification step first.');
+    if (!contractAddress || !merkleProof || !tokenURI) {
+      setError('Please complete all previous steps first.');
       return;
     }
 
@@ -287,12 +345,18 @@ const StudentPortal = ({ account, provider, signer, connectWallet }) => {
         return;
       }
 
-      const tx = await claimCertificate(contractAddress, parsedProof, signer);
+      console.log('🎯 Claiming certificate with:');
+      console.log('Contract address:', contractAddress);
+      console.log('TokenURI:', tokenURI);
+      console.log('Merkle proof:', parsedProof);
+      console.log('TokenURI details:', tokenURIDetails);
+
+      const tx = await claimCertificate(contractAddress, parsedProof, tokenURI, signer);
       console.log('Transaction hash:', tx.hash);
 
       setSuccessMsg(`🎉 Certificate claimed successfully! Transaction hash: ${tx.hash}`);
       setHasClaimed(true);
-      setStep(3);
+      setStep(4); // Move to final step
 
       // Wait for transaction to be mined
       const receipt = await tx.wait();
@@ -304,8 +368,8 @@ const StudentPortal = ({ account, provider, signer, connectWallet }) => {
         setSuccessMsg(prev => prev + ' Certificate has been added to your MetaMask wallet!');
       } catch (metamaskError) {
         console.log('MetaMask add failed:', metamaskError);
-          // Don't show error to user as this is optional
-        }
+        // Don't show error to user as this is optional
+      }
 
     } catch (error) {
       console.error('Error claiming certificate:', error);
@@ -556,6 +620,22 @@ const StudentPortal = ({ account, provider, signer, connectWallet }) => {
               </h3>
               </div>
               <div className="card-body">
+                {/* Step Indicator */}
+                <div className="step-indicator mb-4">
+                  <div className={`step ${step >= 1 ? 'active' : ''}`}>
+                    <span className="step-number">1</span>
+                    <span className="step-label">Verify Eligibility</span>
+                  </div>
+                  <div className={`step ${step >= 2 ? 'active' : ''}`}>
+                    <span className="step-number">2</span>
+                    <span className="step-label">Provide TokenURI</span>
+                  </div>
+                  <div className={`step ${step >= 3 ? 'active' : ''}`}>
+                    <span className="step-number">3</span>
+                    <span className="step-label">Review & Claim</span>
+                  </div>
+                </div>
+
                 <form onSubmit={handleVerifyEligibility}>
                   <div className="mb-3">
                   <label htmlFor="contractAddress" className="form-label premium-form-label body-font">
@@ -627,15 +707,112 @@ const StudentPortal = ({ account, provider, signer, connectWallet }) => {
                 </motion.div>
               )}
 
-              {/* Claim Button */}
-              {isEligible && !hasClaimed && (
+              {/* Step 2: TokenURI Input */}
+              {step === 2 && isEligible && !hasClaimed && (
+                <motion.div
+                  className="tokenuri-section"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <h4 className="step-title body-font">
+                    <Sparkles className="me-2" />
+                    Step 2: Provide TokenURI
+                  </h4>
+                  <p className="step-description body-font">
+                    Enter the tokenURI that contains your certificate metadata (name, description, image, etc.)
+                  </p>
+                  
+                  <form onSubmit={handleTokenURIInput}>
+                    <div className="mb-3">
+                      <label htmlFor="tokenURI" className="form-label premium-form-label body-font">
+                        TokenURI
+                      </label>
+                      <input
+                        type="text"
+                        className="form-control premium-form-control"
+                        id="tokenURI"
+                        value={tokenURI}
+                        onChange={(e) => setTokenURI(e.target.value)}
+                        placeholder="Enter tokenURI (e.g., ipfs://QmHash... or https://...)"
+                        required
+                      />
+                      <div className="form-text body-font">
+                        This should be an IPFS URI or HTTP URL containing your certificate metadata
+                      </div>
+                    </div>
+                    <motion.button
+                      type="submit"
+                      className="btn btn-primary premium-submit-btn body-font"
+                      disabled={loading}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="me-2 loading-spinner" />
+                          Fetching Details...
+                        </>
+                      ) : (
+                        <>
+                          <Search className="me-2" />
+                          Fetch TokenURI Details
+                          <ArrowRight className="ms-2" />
+                        </>
+                      )}
+                    </motion.button>
+                  </form>
+                </motion.div>
+              )}
+
+              {/* Step 3: TokenURI Details Display */}
+              {step === 3 && tokenURIDetails && (
+                <motion.div
+                  className="tokenuri-details-section"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <h4 className="step-title body-font">
+                    <CheckCircle className="me-2" />
+                    Step 3: Certificate Details
+                  </h4>
+                  <div className="tokenuri-details premium-event-details">
+                    <h5 className="details-title body-font">Certificate Metadata</h5>
+                    <div className="details-info body-font">
+                      <p><strong>Name:</strong> {tokenURIDetails.name || 'Not specified'}</p>
+                      <p><strong>Description:</strong> {tokenURIDetails.description || 'Not specified'}</p>
+                      {tokenURIDetails.image && (
+                        <p><strong>Image:</strong> <a href={tokenURIDetails.image} target="_blank" rel="noopener noreferrer">{tokenURIDetails.image}</a></p>
+                      )}
+                      {tokenURIDetails.attributes && tokenURIDetails.attributes.length > 0 && (
+                        <div>
+                          <strong>Attributes:</strong>
+                          <ul>
+                            {tokenURIDetails.attributes.map((attr, index) => (
+                              <li key={index}>{attr.trait_type}: {attr.value}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Step 4: Claim Button */}
+              {step === 3 && isEligible && !hasClaimed && tokenURIDetails && (
                 <motion.div
                   className="claim-section"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5 }}
                 >
-                <form onSubmit={handleClaimCertificate}>
+                  <h4 className="step-title body-font">
+                    <Award className="me-2" />
+                    Step 4: Claim Certificate
+                  </h4>
+                  <form onSubmit={handleClaimCertificate}>
                     <motion.button
                       type="submit" 
                       className="btn btn-success btn-lg premium-claim-btn body-font"
@@ -656,7 +833,7 @@ const StudentPortal = ({ account, provider, signer, connectWallet }) => {
                         </>
                       )}
                     </motion.button>
-                </form>
+                  </form>
                 </motion.div>
               )}
             </div>
