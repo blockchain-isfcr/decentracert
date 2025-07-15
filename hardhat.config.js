@@ -15,7 +15,7 @@ module.exports = {
   },
   networks: {
     sepolia: {
-      url: process.env.SEPOLIA_RPC_URL || "https://sepolia.infura.io/v3/YOUR_INFURA_API_KEY",
+      url: process.env.SEPOLIA_RPC_URL || "https://sepolia.infura.io/v3/",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       gasPrice: 1000000000, // 1 gwei - ultra low gas price
       gas: 3000000, // Set reasonable gas limit

@@ -217,7 +217,7 @@ export const switchToSepoliaNetwork = async () => {
             symbol: 'SEP',
             decimals: 18,
           },
-          rpcUrls: ['https://sepolia.infura.io/v3/'],
+          rpcUrls: [process.env.SEPOLIA_API_URL || 'https://sepolia.infura.io/v3/'],
           blockExplorerUrls: ['https://sepolia.etherscan.io/'],
         }],
       });

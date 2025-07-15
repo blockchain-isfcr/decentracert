@@ -1,7 +1,53 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ethers } from 'ethers';
+import { Search, Shield, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 
 const CertificateVerifier = () => {
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.2
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 30 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.6,
+        ease: "easeOut"
+      }
+    }
+  };
+
+  const cardVariants = {
+    hidden: { opacity: 0, scale: 0.9 },
+    visible: {
+      opacity: 1,
+      scale: 1,
+      transition: {
+        duration: 0.5,
+        ease: "easeOut"
+      }
+    }
+  };
+
+  const buttonVariants = {
+    hover: { 
+      scale: 1.05, 
+      y: -2,
+      boxShadow: "0 8px 25px rgba(139, 92, 246, 0.4)"
+    },
+    tap: { scale: 0.95 }
+  };
+
   const [contractAddress, setContractAddress] = useState('');
   const [walletAddress, setWalletAddress] = useState('');
   const [tokenId, setTokenId] = useState('1');
@@ -131,218 +177,158 @@ const CertificateVerifier = () => {
   };
 
   return (
-    <div className="certificate-verifier">
-      <div className="card">
-        <div className="card-header bg-info text-white">
-          <h4 className="mb-0">🔍 Public Certificate Verification</h4>
-          <p className="mb-0 mt-1"><small>Verify if a soulbound certificate belongs to a specific wallet</small></p>
-        </div>
-        <div className="card-body">
-          <div className="alert alert-info">
-            <h6>🌐 Public Verification Tool</h6>
-            <p className="mb-0">
-              Anyone can use this tool to verify certificate ownership. No wallet connection required - 
-              just enter the contract address and wallet address to verify.
-            </p>
-          </div>
+    <motion.div
+      className="certificate-verifier"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
+      {/* Header Section */}
+      <motion.div 
+        className="portal-header premium-portal-header"
+        variants={itemVariants}
+      >
+        <motion.div
+          className="header-content"
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+        >
+          <motion.div
+            className="header-icon-container"
+            whileHover={{ rotate: 360 }}
+            transition={{ duration: 0.6 }}
+          >
+            <Search size={48} className="header-icon" />
+          </motion.div>
+          <h1 className="portal-title brand-font">Certificate Verification</h1>
+          <p className="portal-subtitle body-font">
+            Public verification tool to check certificate authenticity and ownership on the blockchain
+          </p>
+        </motion.div>
+      </motion.div>
 
-          <form onSubmit={(e) => { e.preventDefault(); verifyOwnership(); }}>
-            <div className="mb-3">
-              <label htmlFor="contractAddress" className="form-label">Certificate Contract Address</label>
-              <input
-                type="text"
-                className="form-control"
-                id="contractAddress"
-                value={contractAddress}
-                onChange={(e) => setContractAddress(e.target.value)}
-                placeholder="0x..."
-                required
-              />
-              <div className="form-text">Enter the soulbound certificate contract address</div>
+      {/* Main Content */}
+      <motion.div 
+        className="row mt-2"
+        variants={itemVariants}
+      >
+        <motion.div 
+          className="col-lg-8 mx-auto"
+          variants={cardVariants}
+        >
+          <motion.div 
+            className="card premium-portal-card"
+            whileHover={{ y: -5 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="card-header premium-card-header">
+              <h3 className="card-title premium-card-title body-font">
+                <Shield className="me-2" />
+                Public Certificate Verification
+              </h3>
             </div>
-
-            <div className="mb-3">
-              <label htmlFor="walletAddress" className="form-label">Wallet Address to Verify</label>
-              <input
-                type="text"
-                className="form-control"
-                id="walletAddress"
-                value={walletAddress}
-                onChange={(e) => setWalletAddress(e.target.value)}
-                placeholder="0x..."
-                required
-              />
-              <div className="form-text">Enter the wallet address you want to verify certificate ownership for</div>
-            </div>
-
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={loading}
-            >
-              {loading ? 'Verifying...' : '🔍 Verify Certificate Ownership'}
-            </button>
-          </form>
-
-          {error && (
-            <div className="alert alert-danger mt-3">
-              <h6>❌ Verification Error</h6>
-              <p className="mb-0">{error}</p>
-            </div>
-          )}
-
-          {verificationResult && (
-            <div className="mt-4">
-              <div className={`alert ${verificationResult.walletInfo.hasCertificate ? 'alert-success' : 'alert-warning'}`}>
-                <h5>
-                  {verificationResult.walletInfo.hasCertificate ? '✅ Certificate Verified!' : '❌ No Certificate Found'}
-                </h5>
+            <div className="card-body">
+              <div className="alert alert-info premium-alert">
+                <h6>🌐 Public Verification Tool</h6>
                 <p className="mb-0">
-                  {verificationResult.walletInfo.hasCertificate 
-                    ? 'This wallet owns a valid soulbound certificate from this contract.'
-                    : 'This wallet does not own any certificates from this contract.'
-                  }
+                  Anyone can use this tool to verify certificate ownership. No wallet connection required - 
+                  just enter the contract address and wallet address to verify.
                 </p>
               </div>
 
-              {/* Contract Information */}
-              <div className="card mb-3">
-                <div className="card-header">
-                  <h6 className="mb-0">📄 Contract Information</h6>
+              <form onSubmit={(e) => { e.preventDefault(); verifyOwnership(); }}>
+                <div className="mb-3">
+                  <label htmlFor="contractAddress" className="form-label premium-form-label body-font">Certificate Contract Address</label>
+                  <input
+                    type="text"
+                    className="form-control premium-form-control"
+                    id="contractAddress"
+                    value={contractAddress}
+                    onChange={(e) => setContractAddress(e.target.value)}
+                    placeholder="0x..."
+                    required
+                  />
+                  <div className="form-text">Enter the soulbound certificate contract address</div>
                 </div>
-                <div className="card-body">
-                  <div className="row">
-                    <div className="col-md-6">
-                      <p><strong>Name:</strong> {verificationResult.contractInfo.name}</p>
-                      <p><strong>Symbol:</strong> {verificationResult.contractInfo.symbol}</p>
-                    </div>
-                    <div className="col-md-6">
-                      <p><strong>Total Certificates:</strong> {verificationResult.contractInfo.totalSupply}</p>
-                      <p><strong>Contract:</strong> <code>{verificationResult.contractInfo.address}</code></p>
-                    </div>
-                  </div>
-                </div>
-              </div>
 
-              {/* Wallet Information */}
-              <div className="card mb-3">
-                <div className="card-header">
-                  <h6 className="mb-0">👤 Wallet Verification</h6>
+                <div className="mb-3">
+                  <label htmlFor="walletAddress" className="form-label premium-form-label body-font">Wallet Address to Verify</label>
+                  <input
+                    type="text"
+                    className="form-control premium-form-control"
+                    id="walletAddress"
+                    value={walletAddress}
+                    onChange={(e) => setWalletAddress(e.target.value)}
+                    placeholder="0x..."
+                    required
+                  />
+                  <div className="form-text">Enter the wallet address you want to verify certificate ownership for</div>
                 </div>
-                <div className="card-body">
-                  <div className="row">
-                    <div className="col-md-6">
-                      <p><strong>Wallet Address:</strong> <code>{verificationResult.walletInfo.address}</code></p>
-                      <p><strong>Has Certificate:</strong> 
-                        <span className={`ms-2 badge ${verificationResult.walletInfo.hasCertificate ? 'bg-success' : 'bg-danger'}`}>
-                          {verificationResult.walletInfo.hasCertificate ? 'YES' : 'NO'}
-                        </span>
+
+                <motion.button
+                  type="submit"
+                  className="btn btn-primary premium-btn"
+                  disabled={loading}
+                  variants={buttonVariants}
+                  whileHover="hover"
+                  whileTap="tap"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="me-2 loading-spinner" />
+                      Verifying...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="me-2" />
+                      Verify Certificate Ownership
+                    </>
+                  )}
+                </motion.button>
+              </form>
+
+              <AnimatePresence>
+                {error && (
+                  <motion.div
+                    className="alert alert-danger premium-alert mt-3"
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <AlertCircle className="me-2" />
+                    <h6>❌ Verification Error</h6>
+                    <p className="mb-0">{error}</p>
+                  </motion.div>
+                )}
+
+                {verificationResult && (
+                  <motion.div
+                    className="mt-4"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6 }}
+                  >
+                    <div className={`alert ${verificationResult.walletInfo.hasCertificate ? 'alert-success' : 'alert-warning'} premium-alert`}>
+                      <h5>
+                        {verificationResult.walletInfo.hasCertificate ? '✅ Certificate Verified!' : '❌ No Certificate Found'}
+                      </h5>
+                      <p className="mb-0">
+                        {verificationResult.walletInfo.hasCertificate 
+                          ? 'The certificate exists and belongs to the specified wallet address.'
+                          : 'No certificate was found for the specified wallet address in this contract.'
+                        }
                       </p>
                     </div>
-                    <div className="col-md-6">
-                      <p><strong>Certificate Count:</strong> {verificationResult.walletInfo.balance}</p>
-                      <p><strong>Verified At:</strong> {new Date(verificationResult.verifiedAt).toLocaleString()}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Certificate Details */}
-              {verificationResult.ownershipDetails && (
-                <div className="card mb-3">
-                  <div className="card-header">
-                    <h6 className="mb-0">🔗 Certificate Details</h6>
-                  </div>
-                  <div className="card-body">
-                    <div className="row">
-                      <div className="col-md-8">
-                        <p><strong>Token ID:</strong> {verificationResult.ownershipDetails.tokenId}</p>
-                        <p><strong>Metadata URI:</strong> 
-                          <a href={verificationResult.ownershipDetails.uri.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')} 
-                             target="_blank" 
-                             rel="noopener noreferrer"
-                             className="ms-2">
-                            View on IPFS
-                          </a>
-                        </p>
-                        <p><strong>Blockchain Owner:</strong> <code>{verificationResult.ownershipDetails.owner}</code></p>
-                        <p><strong>Ownership Match:</strong> 
-                          <span className={`ms-2 badge ${verificationResult.ownershipDetails.isCorrectOwner ? 'bg-success' : 'bg-danger'}`}>
-                            {verificationResult.ownershipDetails.isCorrectOwner ? 'VERIFIED' : 'MISMATCH'}
-                          </span>
-                        </p>
-                      </div>
-                      <div className="col-md-4">
-                        {verificationResult.metadata?.image && (
-                          <img 
-                            src={verificationResult.metadata.image.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')} 
-                            alt="Certificate" 
-                            className="img-fluid rounded border"
-                            style={{maxHeight: '150px'}}
-                          />
-                        )}
-                      </div>
-                    </div>
-                    
-                    {verificationResult.metadata && (
-                      <div className="mt-3">
-                        <h6>📋 Certificate Metadata:</h6>
-                        <p><strong>Name:</strong> {verificationResult.metadata.name}</p>
-                        <p><strong>Description:</strong> {verificationResult.metadata.description}</p>
-                        {verificationResult.metadata.attributes && (
-                          <div>
-                            <strong>Attributes:</strong>
-                            <ul className="mt-2">
-                              {verificationResult.metadata.attributes.map((attr, index) => (
-                                <li key={index}><strong>{attr.trait_type}:</strong> {attr.value}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Verification Actions */}
-              <div className="card">
-                <div className="card-header">
-                  <h6 className="mb-0">🔗 Share Verification</h6>
-                </div>
-                <div className="card-body">
-                  <div className="d-grid gap-2">
-                    <button 
-                      className="btn btn-outline-primary"
-                      onClick={copyVerificationLink}
-                    >
-                      📋 Copy Verification Link
-                    </button>
-                    
-                    <a 
-                      href={`https://sepolia.etherscan.io/address/${contractAddress}#readContract`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn btn-outline-info"
-                    >
-                      🔍 Verify on Etherscan
-                    </a>
-                  </div>
-                  
-                  <div className="alert alert-info mt-3">
-                    <h6>🌐 Public Verification</h6>
-                    <p className="mb-0">
-                      This verification is performed directly on the blockchain and can be independently 
-                      verified by anyone. The results are tamper-proof and immutable.
-                    </p>
-                  </div>
-                </div>
-              </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-          )}
-        </div>
-      </div>
-    </div>
+          </motion.div>
+        </motion.div>
+      </motion.div>
+    </motion.div>
   );
 };
 

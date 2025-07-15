@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link } from 'react-router-dom';
 import { ethers } from 'ethers';
+import { motion, AnimatePresence } from 'framer-motion';
 import StudentPortal from './components/StudentPortal';
 import OrganizerPortal from './components/OrganizerPortal';
 import CertificateVerifier from './components/CertificateVerifier';
@@ -116,7 +117,12 @@ function App() {
   };
 
   return (
-    <div className="app">
+    <motion.div 
+      className="app"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+    >
       <Navbar 
         account={account} 
         connectWallet={connectWallet} 
@@ -125,15 +131,28 @@ function App() {
         networkName={networkName}
       />
       
-      {error && (
-        <div className="container mt-3">
-          <div className="alert alert-danger" role="alert">
-            {error}
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {error && (
+          <motion.div 
+            className="container mt-3"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="alert alert-danger premium-alert" role="alert">
+              {error}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <div className="container py-4">
+      <motion.div 
+        className="container py-4"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.2 }}
+      >
         <Routes>
           <Route path="/" element={<HomePage account={account} connectWallet={connectWallet} />} />
           <Route 
@@ -173,14 +192,19 @@ function App() {
             }
           />
         </Routes>
-      </div>
+      </motion.div>
       
-      <footer className="footer mt-auto py-3 bg-light">
+      <motion.footer 
+        className="footer mt-auto py-4 premium-footer"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.8, delay: 0.5 }}
+      >
         <div className="container text-center">
-          <span className="text-muted">Certificate NFT System &copy; {new Date().getFullYear()}</span>
+          <span className="text-muted body-font">DecentraCert &copy; {new Date().getFullYear()}</span>
         </div>
-      </footer>
-    </div>
+      </motion.footer>
+    </motion.div>
   );
 }
 

@@ -775,29 +775,87 @@ export const createCertificateMetadata = async (eventData, designResult, recipie
 export const uploadCertificateToIPFS = async (metadata, imageDataUrl = null) => {
   try {
     console.log('📤 Uploading certificate to IPFS...');
-    if (imageDataUrl) {
-      console.log('Image data URL length:', imageDataUrl.length);
-      console.log('Image type:', imageDataUrl.substring(0, 30) + '...');
+    
+    if (!imageDataUrl) {
+      throw new Error('No image data provided for upload');
     }
 
-    // In production, implement actual IPFS upload
-    // For now, simulate the upload and use the data URL directly
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Convert data URL to blob for upload
+    const response = await fetch(imageDataUrl);
+    const blob = await response.blob();
+    
+    // Create file from blob
+    const file = new File([blob], 'certificate-design.png', { type: 'image/png' });
+    
+    // Create form data for upload
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const uploadMetadata = {
+      name: metadata.name || 'certificate-design',
+    };
+    formData.append('metadata', JSON.stringify(uploadMetadata));
 
-    const mockIPFSHash = `Qm${Math.random().toString(36).substring(2, 15)}${Math.random().toString(36).substring(2, 15)}`;
-    const ipfsUrl = `ipfs://${mockIPFSHash}`;
+    console.log('📤 Sending to server API...');
+    
+    // Upload image to IPFS via server
+    const uploadResponse = await fetch('/api/upload-ipfs', {
+      method: 'POST',
+      body: formData,
+    });
 
-    // For now, we'll use the data URL directly in metadata
-    // In production, upload the image to IPFS and use that URL
-    if (imageDataUrl && metadata) {
-      metadata.image = imageDataUrl; // Use data URL directly for now
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      console.error('❌ Server response error:', errorText);
+      
+      let errorMessage = 'Failed to upload certificate to IPFS';
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.error || errorMessage;
+      } catch (parseError) {
+        console.error('❌ Could not parse error response:', parseError);
+        errorMessage = `Server error: ${uploadResponse.status} ${uploadResponse.statusText}`;
+      }
+      
+      throw new Error(errorMessage);
     }
+
+    const uploadResult = await uploadResponse.json();
+    console.log('✅ Image uploaded successfully:', uploadResult.ipfsHash);
+
+    // Now upload metadata to IPFS
+    const metadataResponse = await fetch('/api/upload-metadata', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(metadata),
+    });
+
+    if (!metadataResponse.ok) {
+      const errorText = await metadataResponse.text();
+      console.error('❌ Metadata upload error:', errorText);
+      
+      let errorMessage = 'Failed to upload metadata to IPFS';
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.error || errorMessage;
+      } catch (parseError) {
+        console.error('❌ Could not parse error response:', parseError);
+        errorMessage = `Server error: ${metadataResponse.status} ${metadataResponse.statusText}`;
+      }
+      
+      throw new Error(errorMessage);
+    }
+
+    const metadataResult = await metadataResponse.json();
+    console.log('✅ Metadata uploaded successfully:', metadataResult.ipfsHash);
 
     return {
       success: true,
-      ipfsHash: mockIPFSHash,
-      ipfsUrl: ipfsUrl,
-      gatewayUrl: imageDataUrl || `https://gateway.pinata.cloud/ipfs/${mockIPFSHash}`, // Use data URL for immediate display
+      ipfsHash: metadataResult.ipfsHash,
+      ipfsUrl: `ipfs://${metadataResult.ipfsHash}`,
+      gatewayUrl: `https://gateway.pinata.cloud/ipfs/${metadataResult.ipfsHash}`,
       metadata
     };
 

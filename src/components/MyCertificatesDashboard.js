@@ -1,7 +1,53 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ethers } from 'ethers';
+import { Award, Wallet, Search, Download, Share2, ExternalLink, RefreshCw, Loader2 } from 'lucide-react';
 
 const MyCertificatesDashboard = ({ account, provider, connectWallet }) => {
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.2
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 30 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.6,
+        ease: "easeOut"
+      }
+    }
+  };
+
+  const cardVariants = {
+    hidden: { opacity: 0, scale: 0.9 },
+    visible: {
+      opacity: 1,
+      scale: 1,
+      transition: {
+        duration: 0.5,
+        ease: "easeOut"
+      }
+    }
+  };
+
+  const buttonVariants = {
+    hover: { 
+      scale: 1.05, 
+      y: -2,
+      boxShadow: "0 8px 25px rgba(139, 92, 246, 0.4)"
+    },
+    tap: { scale: 0.95 }
+  };
+
   const [certificates, setCertificates] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -79,11 +125,11 @@ const MyCertificatesDashboard = ({ account, provider, connectWallet }) => {
       setDiscoveryStatus('📜 Analyzing your transaction history for certificate contracts...');
       const contractsFromHistory = await getContractsFromTransactionHistory();
 
-      // Method 2: Add your specific contract for testing
-      const testContracts = [
-        '0x767423aBe688BB55482d870227f1bF5E6eaba422', // Your deployed contract
-        ...contractsFromHistory
-      ];
+          // Method 2: Add your specific contract for testing
+    const testContracts = [
+      process.env.REACT_APP_DEPLOYED_CONTRACT_ADDRESS || '0x0000000000000000000000000000000000000000', // Your deployed contract
+      ...contractsFromHistory
+    ];
 
       // Method 3: Add any saved contracts
       const savedContracts = knownContracts.map(c => c.address);
@@ -498,7 +544,7 @@ ${allContracts.length > 5 ? `• ... and ${allContracts.length - 5} more` : ''}
   };
 
   const testYourContract = async () => {
-    const yourContract = '0x767423aBe688BB55482d870227f1bF5E6eaba422';
+    const yourContract = process.env.REACT_APP_DEPLOYED_CONTRACT_ADDRESS || '0x0000000000000000000000000000000000000000';
     setLoading(true);
     setError('');
     setDiscoveryStatus(`🔍 Testing your specific contract: ${yourContract}...`);
@@ -658,260 +704,350 @@ ${certificates.map(cert => `✅ ${cert.metadata.name || cert.contractName}`).joi
 
   if (!account) {
     return (
-      <div className="my-certificates-dashboard">
-        <div className="card">
-          <div className="card-header bg-primary text-white">
-            <h4 className="mb-0">🎓 My Certificates Dashboard</h4>
-          </div>
+      <motion.div
+        className="premium-wallet-connect-container"
+        initial={{ opacity: 0, y: 50 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+      >
+        <motion.div 
+          className="card premium-connect-card"
+          whileHover={{ scale: 1.02 }}
+          transition={{ duration: 0.3 }}
+        >
           <div className="card-body text-center">
-            <div className="alert alert-info">
-              <h5>Connect Your Wallet</h5>
-              <p>Connect your MetaMask wallet to view all your soulbound certificates.</p>
-              <button className="btn btn-primary" onClick={connectWallet}>
-                🦊 Connect MetaMask
-              </button>
-            </div>
+            <motion.div
+              className="connect-icon-container"
+              whileHover={{ rotate: 360 }}
+              transition={{ duration: 0.6 }}
+            >
+              <Wallet size={64} className="connect-icon" />
+            </motion.div>
+            <h2 className="card-title premium-card-title brand-font">Connect Your Wallet</h2>
+            <p className="card-text premium-card-text body-font">
+              Please connect your MetaMask wallet to view and manage your certificates.
+            </p>
+            <motion.button
+              className="btn btn-primary btn-lg premium-connect-btn body-font"
+              onClick={connectWallet}
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Wallet className="me-2" />
+              Connect Wallet
+            </motion.button>
           </div>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     );
   }
 
   return (
-    <div className="my-certificates-dashboard">
-      <div className="card">
-        <div className="card-header bg-primary text-white">
-          <h4 className="mb-0">🎓 My Certificates Dashboard</h4>
-          <p className="mb-0 mt-1"><small>All your soulbound certificates in one place</small></p>
-        </div>
-        <div className="card-body">
-          <div className="alert alert-success">
-            <h6>✅ Wallet Connected</h6>
-            <p className="mb-2">Connected: <code>{account}</code></p>
-            <p className="mb-0">Found <strong>{certificates.length}</strong> certificate(s)</p>
-          </div>
+    <motion.div
+      className="my-certificates-dashboard"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
+      {/* Header Section */}
+      <motion.div 
+        className="portal-header premium-portal-header"
+        variants={itemVariants}
+      >
+        <motion.div
+          className="header-content"
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+        >
+          <motion.div
+            className="header-icon-container"
+            whileHover={{ rotate: 360 }}
+            transition={{ duration: 0.6 }}
+          >
+            <Award size={48} className="header-icon" />
+          </motion.div>
+          <h1 className="portal-title brand-font">My Certificates</h1>
+          <p className="portal-subtitle body-font">
+            View and manage your blockchain certificates and digital achievements
+          </p>
+        </motion.div>
+      </motion.div>
 
-          {/* Add Custom Contract */}
-          <div className="card mb-4">
-            <div className="card-header">
-              <h6 className="mb-0">➕ Add Certificate Contract</h6>
+      {/* Main Content */}
+      <motion.div 
+        className="row mt-2"
+        variants={itemVariants}
+      >
+        <motion.div 
+          className="col-lg-10 mx-auto"
+          variants={cardVariants}
+        >
+          <motion.div 
+            className="card premium-portal-card"
+            whileHover={{ y: -5 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="card-header premium-card-header">
+              <h3 className="card-title premium-card-title body-font">
+                <Award className="me-2" />
+                Certificate Discovery & Management
+              </h3>
             </div>
             <div className="card-body">
-              <div className="input-group mb-3">
-                <input
-                  type="text"
-                  className="form-control"
-                  placeholder="Enter contract address (0x...)"
-                  value={customContract}
-                  onChange={(e) => setCustomContract(e.target.value)}
-                />
+              <div className="alert alert-info premium-alert">
+                <h6>🔍 Automatic Certificate Discovery</h6>
+                <p className="mb-0">
+                  We'll automatically scan the blockchain for your certificates. You can also manually add contract addresses.
+                </p>
+              </div>
+
+              <motion.button
+                className="btn btn-primary premium-btn mb-3"
+                onClick={scanForCertificates}
+                disabled={loading}
+                variants={buttonVariants}
+                whileHover="hover"
+                whileTap="tap"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="me-2 loading-spinner" />
+                    Scanning...
+                  </>
+                ) : (
+                  <>
+                    <Search className="me-2" />
+                    Scan for Certificates
+                  </>
+                )}
+              </motion.button>
+
+              {discoveryStatus && (
+                <motion.div
+                  className="alert alert-info premium-alert"
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <RefreshCw className="me-2 loading-spinner" />
+                  {discoveryStatus}
+                </motion.div>
+              )}
+
+              <AnimatePresence>
+                {error && (
+                  <motion.div
+                    className="alert alert-danger premium-alert"
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <h6>❌ Error</h6>
+                    <p className="mb-0">{error}</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Add Custom Contract */}
+              <div className="card mb-4">
+                <div className="card-header">
+                  <h6 className="mb-0">➕ Add Certificate Contract</h6>
+                </div>
+                <div className="card-body">
+                  <div className="input-group mb-3">
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Enter contract address (0x...)"
+                      value={customContract}
+                      onChange={(e) => setCustomContract(e.target.value)}
+                    />
+                    <button
+                      className="btn btn-outline-primary"
+                      onClick={addCustomContract}
+                      disabled={loading}
+                    >
+                      Add Contract
+                    </button>
+                  </div>
+
+                  <div className="alert alert-info">
+                    <h6>💡 How to find your certificates:</h6>
+                    <ul className="mb-2">
+                      <li><strong>Automatic Discovery:</strong> Click "Automatically Discover" above - scans your transaction history</li>
+                      <li><strong>From Organizer:</strong> Get contract address from certificate organizer</li>
+                      <li><strong>From Email/Download:</strong> Check certificate claim emails or downloaded files</li>
+                      <li><strong>From Etherscan:</strong> Look at your wallet's transaction history</li>
+                    </ul>
+                    <p className="mb-0"><strong>Note:</strong> The automatic discovery scans your blockchain transaction history to find certificate contracts you've interacted with.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Scan Buttons */}
+              <div className="d-grid gap-2 mb-4">
                 <button
-                  className="btn btn-outline-primary"
-                  onClick={addCustomContract}
+                  className="btn btn-primary"
+                  onClick={testYourContract}
                   disabled={loading}
                 >
-                  Add Contract
+                  {loading ? 'Testing...' : '🎯 Test Your Specific Contract (0x767423...)'}
                 </button>
               </div>
 
-              <div className="alert alert-info">
-                <h6>💡 How to find your certificates:</h6>
-                <ul className="mb-2">
-                  <li><strong>Automatic Discovery:</strong> Click "Automatically Discover" above - scans your transaction history</li>
-                  <li><strong>From Organizer:</strong> Get contract address from certificate organizer</li>
-                  <li><strong>From Email/Download:</strong> Check certificate claim emails or downloaded files</li>
-                  <li><strong>From Etherscan:</strong> Look at your wallet's transaction history</li>
-                </ul>
-                <p className="mb-0"><strong>Note:</strong> The automatic discovery scans your blockchain transaction history to find certificate contracts you've interacted with.</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Scan Buttons */}
-          <div className="d-grid gap-2 mb-4">
-            <button
-              className="btn btn-primary"
-              onClick={scanForCertificates}
-              disabled={loading}
-            >
-              {loading ? 'Scanning...' : '🔍 Automatically Discover My Certificates'}
-            </button>
-
-            <button
-              className="btn btn-success"
-              onClick={testYourContract}
-              disabled={loading}
-            >
-              {loading ? 'Testing...' : '🎯 Test Your Specific Contract (0x767423...)'}
-            </button>
-          </div>
-
-          {/* Discovery Status */}
-          {discoveryStatus && (
-            <div className="alert alert-info">
-              <div className="d-flex align-items-center">
-                {loading && <div className="spinner-border spinner-border-sm me-2" role="status"></div>}
-                <span>{discoveryStatus}</span>
-              </div>
-            </div>
-          )}
-
-          {error && (
-            <div className="alert alert-warning">
-              <h6>⚠️ Notice</h6>
-              <p className="mb-0">{error}</p>
-            </div>
-          )}
-
-          {/* Portfolio Actions */}
-          {certificates.length > 0 && (
-            <div className="card mb-4">
-              <div className="card-header">
-                <h6 className="mb-0">📤 Share Your Certificate Portfolio</h6>
-              </div>
-              <div className="card-body">
-                <div className="row">
-                  <div className="col-md-6">
-                    <div className="d-grid gap-2">
-                      <button
-                        className="btn btn-linkedin"
-                        style={{backgroundColor: '#0077b5', color: 'white'}}
-                        onClick={sharePortfolioToLinkedIn}
-                      >
-                        💼 Share Portfolio on LinkedIn
-                      </button>
-
-                      <button
-                        className="btn btn-outline-success"
-                        onClick={exportCertificatePortfolio}
-                      >
-                        📥 Export Complete Portfolio
-                      </button>
-                    </div>
+              {/* Portfolio Actions */}
+              {certificates.length > 0 && (
+                <div className="card mb-4">
+                  <div className="card-header">
+                    <h6 className="mb-0">📤 Share Your Certificate Portfolio</h6>
                   </div>
-                  <div className="col-md-6">
-                    <div className="alert alert-info mb-0">
-                      <h6>🎓 Your Portfolio</h6>
-                      <p className="mb-1"><strong>{certificates.length}</strong> verified certificate{certificates.length > 1 ? 's' : ''}</p>
-                      <p className="mb-0">All permanently bound to your wallet</p>
+                  <div className="card-body">
+                    <div className="row">
+                      <div className="col-md-6">
+                        <div className="d-grid gap-2">
+                          <button
+                            className="btn btn-linkedin"
+                            style={{backgroundColor: '#0077b5', color: 'white'}}
+                            onClick={sharePortfolioToLinkedIn}
+                          >
+                            �� Share Portfolio on LinkedIn
+                          </button>
+
+                          <button
+                            className="btn btn-outline-success"
+                            onClick={exportCertificatePortfolio}
+                          >
+                            📥 Export Complete Portfolio
+                          </button>
+                        </div>
+                      </div>
+                      <div className="col-md-6">
+                        <div className="alert alert-info mb-0">
+                          <h6>🎓 Your Portfolio</h6>
+                          <p className="mb-1"><strong>{certificates.length}</strong> verified certificate{certificates.length > 1 ? 's' : ''}</p>
+                          <p className="mb-0">All permanently bound to your wallet</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
+              )}
 
-          {/* Certificates Display */}
-          {certificates.length > 0 && (
-            <div className="certificates-grid">
-              <h5 className="mb-3">Your Soulbound Certificates:</h5>
-              {certificates.map((cert, index) => (
-                <div key={index} className="card mb-4 border-primary">
-                  <div className="card-body">
-                    <div className="row">
-                      <div className="col-md-8">
-                        <h5 className="card-title">
-                          🎓 {cert.metadata.name || cert.contractName}
-                        </h5>
-                        <p className="card-text">
-                          {cert.metadata.description || 'Soulbound Certificate'}
-                        </p>
-                        
-                        <div className="certificate-info">
-                          <p className="mb-1"><strong>Issuer:</strong> {cert.contractName} ({cert.contractSymbol})</p>
-                          <p className="mb-1"><strong>Token ID:</strong> {cert.tokenId}</p>
-                          <p className="mb-1"><strong>Issue Date:</strong> {
-                            cert.metadata.attributes?.find(attr => attr.trait_type === 'Issue Date')?.value || 'Not specified'
-                          }</p>
-                          <p className="mb-1"><strong>Status:</strong> 
-                            <span className="badge bg-success ms-2">VERIFIED ✅</span>
-                          </p>
-                        </div>
+              {/* Certificates Display */}
+              {certificates.length > 0 && (
+                <div className="certificates-grid">
+                  <h5 className="mb-3">Your Soulbound Certificates:</h5>
+                  {certificates.map((cert, index) => (
+                    <div key={index} className="card mb-4 border-primary">
+                      <div className="card-body">
+                        <div className="row">
+                          <div className="col-md-8">
+                            <h5 className="card-title">
+                              🎓 {cert.metadata.name || cert.contractName}
+                            </h5>
+                            <p className="card-text">
+                              {cert.metadata.description || 'Soulbound Certificate'}
+                            </p>
+                            
+                            <div className="certificate-info">
+                              <p className="mb-1"><strong>Issuer:</strong> {cert.contractName} ({cert.contractSymbol})</p>
+                              <p className="mb-1"><strong>Token ID:</strong> {cert.tokenId}</p>
+                              <p className="mb-1"><strong>Issue Date:</strong> {
+                                cert.metadata.attributes?.find(attr => attr.trait_type === 'Issue Date')?.value || 'Not specified'
+                              }</p>
+                              <p className="mb-1"><strong>Status:</strong> 
+                                <span className="badge bg-success ms-2">VERIFIED ✅</span>
+                              </p>
+                            </div>
 
-                        {/* Sharing Options */}
-                        <div className="sharing-options mt-3">
-                          <h6>📤 Share Certificate:</h6>
-                          <div className="btn-group-vertical d-grid gap-2">
-                            <button 
-                              className="btn btn-linkedin"
-                              style={{backgroundColor: '#0077b5', color: 'white'}}
-                              onClick={() => shareToLinkedIn(cert)}
-                            >
-                              💼 Share on LinkedIn
-                            </button>
+                            {/* Sharing Options */}
+                            <div className="sharing-options mt-3">
+                              <h6>📤 Share Certificate:</h6>
+                              <div className="btn-group-vertical d-grid gap-2">
+                                <button 
+                                  className="btn btn-linkedin"
+                                  style={{backgroundColor: '#0077b5', color: 'white'}}
+                                  onClick={() => shareToLinkedIn(cert)}
+                                >
+                                  💼 Share on LinkedIn
+                                </button>
+                                
+                                <button 
+                                  className="btn btn-twitter"
+                                  style={{backgroundColor: '#1da1f2', color: 'white'}}
+                                  onClick={() => shareToTwitter(cert)}
+                                >
+                                  🐦 Share on Twitter
+                                </button>
+                                
+                                <button 
+                                  className="btn btn-outline-primary"
+                                  onClick={() => copyVerificationLink(cert)}
+                                >
+                                  📋 Copy Verification Link
+                                </button>
+                                
+                                <button 
+                                  className="btn btn-outline-success"
+                                  onClick={() => downloadCertificate(cert)}
+                                >
+                                  📥 Download Certificate Data
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="col-md-4 text-center">
+                            {cert.metadata.image && (
+                              <img 
+                                src={cert.metadata.image.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')} 
+                                alt="Certificate" 
+                                className="img-fluid rounded border mb-3"
+                                style={{maxHeight: '200px'}}
+                              />
+                            )}
                             
-                            <button 
-                              className="btn btn-twitter"
-                              style={{backgroundColor: '#1da1f2', color: 'white'}}
-                              onClick={() => shareToTwitter(cert)}
-                            >
-                              🐦 Share on Twitter
-                            </button>
-                            
-                            <button 
-                              className="btn btn-outline-primary"
-                              onClick={() => copyVerificationLink(cert)}
-                            >
-                              📋 Copy Verification Link
-                            </button>
-                            
-                            <button 
-                              className="btn btn-outline-success"
-                              onClick={() => downloadCertificate(cert)}
-                            >
-                              📥 Download Certificate Data
-                            </button>
+                            <div className="d-grid gap-2">
+                              <a 
+                                href={`https://sepolia.etherscan.io/address/${cert.contractAddress}#readContract`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-outline-info btn-sm"
+                              >
+                                🔍 Verify on Etherscan
+                              </a>
+                              
+                              <a 
+                                href={cert.uri.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn btn-outline-secondary btn-sm"
+                              >
+                                📄 View Metadata
+                              </a>
+                            </div>
                           </div>
                         </div>
                       </div>
-                      
-                      <div className="col-md-4 text-center">
-                        {cert.metadata.image && (
-                          <img 
-                            src={cert.metadata.image.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')} 
-                            alt="Certificate" 
-                            className="img-fluid rounded border mb-3"
-                            style={{maxHeight: '200px'}}
-                          />
-                        )}
-                        
-                        <div className="d-grid gap-2">
-                          <a 
-                            href={`https://sepolia.etherscan.io/address/${cert.contractAddress}#readContract`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="btn btn-outline-info btn-sm"
-                          >
-                            🔍 Verify on Etherscan
-                          </a>
-                          
-                          <a 
-                            href={cert.uri.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="btn btn-outline-secondary btn-sm"
-                          >
-                            📄 View Metadata
-                          </a>
-                        </div>
-                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+              )}
 
-          {certificates.length === 0 && !loading && (
-            <div className="alert alert-info text-center">
-              <h5>🔍 No Certificates Found</h5>
-              <p>Add certificate contract addresses above to discover your certificates.</p>
-              <p className="mb-0">Your certificates will appear here once contracts are added.</p>
+              {certificates.length === 0 && !loading && (
+                <div className="alert alert-info text-center">
+                  <h5>🔍 No Certificates Found</h5>
+                  <p>Add certificate contract addresses above to discover your certificates.</p>
+                  <p className="mb-0">Your certificates will appear here once contracts are added.</p>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      </div>
-    </div>
+          </motion.div>
+        </motion.div>
+      </motion.div>
+    </motion.div>
   );
 };
 

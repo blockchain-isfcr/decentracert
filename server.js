@@ -11,10 +11,16 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Multer for file uploads
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
 
 // API Routes - these must come BEFORE static file serving
 app.post('/api/upload-ipfs', upload.single('file'), async (req, res) => {
@@ -26,6 +32,11 @@ app.post('/api/upload-ipfs', upload.single('file'), async (req, res) => {
     if (!file) {
       console.log('❌ No file provided');
       return res.status(400).json({ error: 'No file provided' });
+    }
+
+    if (!process.env.PINATA_JWT) {
+      console.log('❌ PINATA_JWT not configured');
+      return res.status(500).json({ error: 'Pinata JWT not configured on server' });
     }
 
     console.log('📁 File received:', file.originalname, 'Size:', file.size);
@@ -50,18 +61,32 @@ app.post('/api/upload-ipfs', upload.single('file'), async (req, res) => {
       formData,
       {
         maxBodyLength: 'Infinity',
+        maxContentLength: 'Infinity',
         headers: {
           'Authorization': `Bearer ${process.env.PINATA_JWT}`,
           ...formData.getHeaders(),
         },
+        timeout: 30000, // 30 second timeout
       }
     );
+
+    if (!response.data || !response.data.IpfsHash) {
+      throw new Error('Invalid response from Pinata API');
+    }
 
     console.log('✅ IPFS upload successful:', response.data.IpfsHash);
     res.json({ ipfsHash: response.data.IpfsHash });
   } catch (error) {
     console.error('❌ Error uploading to IPFS:', error.message);
-    res.status(500).json({ error: `Failed to upload to IPFS: ${error.message}` });
+    console.error('❌ Error details:', error.response?.data || error.stack);
+    
+    if (error.response?.status === 401) {
+      res.status(401).json({ error: 'Pinata authentication failed. Please check your JWT token.' });
+    } else if (error.response?.status === 413) {
+      res.status(413).json({ error: 'File too large. Please use a smaller file.' });
+    } else {
+      res.status(500).json({ error: `Failed to upload to IPFS: ${error.message}` });
+    }
   }
 });
 
@@ -69,6 +94,11 @@ app.post('/api/upload-metadata', async (req, res) => {
   console.log('📤 Metadata upload request received');
   try {
     const metadata = req.body;
+
+    if (!process.env.PINATA_JWT) {
+      console.log('❌ PINATA_JWT not configured');
+      return res.status(500).json({ error: 'Pinata JWT not configured on server' });
+    }
 
     console.log('🔐 Using PINATA_JWT:', process.env.PINATA_JWT ? 'Present' : 'Missing');
 
@@ -81,14 +111,25 @@ app.post('/api/upload-metadata', async (req, res) => {
           'Authorization': `Bearer ${process.env.PINATA_JWT}`,
           'Content-Type': 'application/json',
         },
+        timeout: 30000, // 30 second timeout
       }
     );
+
+    if (!response.data || !response.data.IpfsHash) {
+      throw new Error('Invalid response from Pinata API');
+    }
 
     console.log('✅ Metadata upload successful:', response.data.IpfsHash);
     res.json({ ipfsHash: response.data.IpfsHash });
   } catch (error) {
     console.error('❌ Error uploading metadata to IPFS:', error.message);
-    res.status(500).json({ error: `Failed to upload metadata to IPFS: ${error.message}` });
+    console.error('❌ Error details:', error.response?.data || error.stack);
+    
+    if (error.response?.status === 401) {
+      res.status(401).json({ error: 'Pinata authentication failed. Please check your JWT token.' });
+    } else {
+      res.status(500).json({ error: `Failed to upload metadata to IPFS: ${error.message}` });
+    }
   }
 });
 
@@ -98,12 +139,19 @@ app.get('/api/etherscan/:endpoint', async (req, res) => {
     const { endpoint } = req.params;
     const params = req.query;
     
+    if (!process.env.ETHERSCAN_API_KEY) {
+      return res.status(500).json({ error: 'Etherscan API key not configured' });
+    }
+    
     // Add API key to params
     params.apikey = process.env.ETHERSCAN_API_KEY;
 
     const response = await axios.get(
       `https://api-sepolia.etherscan.io/api?module=${endpoint}`,
-      { params }
+      { 
+        params,
+        timeout: 10000 // 10 second timeout
+      }
     );
 
     res.json(response.data);
@@ -120,7 +168,7 @@ app.post('/api/network/provider', async (req, res) => {
     
     if (network === 'sepolia') {
       res.json({ 
-        rpcUrl: process.env.SEPOLIA_API_URL || 'https://sepolia.infura.io/v3/YOUR_INFURA_API_KEY'
+        rpcUrl: process.env.SEPOLIA_API_URL || 'https://sepolia.infura.io/v3/'
       });
     } else {
       res.status(400).json({ error: 'Unsupported network' });
@@ -143,6 +191,7 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
 
+// Single app.listen() call at the end
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📡 API available at http://localhost:${PORT}/api`);

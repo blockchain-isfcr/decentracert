@@ -1,5 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  GraduationCap, 
+  Shield, 
+  CheckCircle, 
+  AlertCircle, 
+  Loader2, 
+  ExternalLink, 
+  Wallet,
+  Award,
+  FileText,
+  Search,
+  ArrowRight,
+  Sparkles
+} from 'lucide-react';
 import { hasAddressClaimed, isAddressEligible, claimCertificate, getEventDetails } from '../utils/contractUtils';
 import { verifyMerkleProof } from '../utils/merkleUtils';
 import { autoAddCertificateToMetaMask, addSoulboundCertificateToMetaMask, verifyCertificateInMetaMask } from '../utils/metamaskUtils';
@@ -21,6 +36,29 @@ const StudentPortal = ({ account, provider, signer, connectWallet }) => {
   const [myCertificates, setMyCertificates] = useState([]);
   const [loadingCertificates, setLoadingCertificates] = useState(false);
   const [showViewer, setShowViewer] = useState(false);
+
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.2
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 30 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.6,
+        ease: "easeOut"
+      }
+    }
+  };
 
   // Reset state when account changes
   useEffect(() => {
@@ -198,56 +236,40 @@ const StudentPortal = ({ account, provider, signer, connectWallet }) => {
           console.log('❌ Verification error:', verifyError);
         }
 
-      } catch (debugError) {
-        console.log('Debug error:', debugError);
-      }
-
-      // Check if the user is eligible
+        // Check eligibility using the contract
       const eligible = await isAddressEligible(contractAddress, account, parsedProof, provider);
-      console.log('Is eligible:', eligible);
-
-      setIsEligible(eligible);
+        console.log('Contract eligibility check result:', eligible);
 
       if (eligible) {
-        setSuccessMsg('You are eligible to claim this certificate!');
+          setIsEligible(true);
+          setSuccessMsg('✅ You are eligible to claim this certificate!');
         setStep(2);
       } else {
-        setError(`You are not eligible to claim this certificate.
-
-Debug info:
-- Your address: ${account}
-- Has claimed: ${hasClaimed}
-- Make sure your wallet address was included in the original participant list and you're using the correct Merkle proof for YOUR specific address.`);
+          setError('❌ You are not eligible for this certificate. Please check your Merkle proof.');
+        }
+      } catch (contractError) {
+        console.error('Contract interaction error:', contractError);
+        setError('Failed to verify eligibility. Please check the contract address and try again.');
       }
     } catch (error) {
       console.error('Error verifying eligibility:', error);
-      setError('Failed to verify eligibility: ' + error.message);
+      setError('An error occurred while verifying eligibility. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle form submission to claim certificate
+  // Handle certificate claiming
   const handleClaimCertificate = async (e) => {
     e.preventDefault();
     
-    if (!account) {
+    if (!account || !signer) {
       setError('Please connect your wallet first.');
       return;
     }
 
-    if (!isEligible) {
-      setError('You are not eligible to claim this certificate.');
-      return;
-    }
-
-    if (hasClaimed) {
-      setError('You have already claimed this certificate.');
-      return;
-    }
-
-    if (!tokenURI) {
-      setError('Please enter the token URI for your certificate.');
+    if (!contractAddress || !merkleProof) {
+      setError('Please complete the verification step first.');
       return;
     }
 
@@ -256,34 +278,51 @@ Debug info:
     setSuccessMsg('');
 
     try {
-      // Parse the Merkle proof JSON
-      const parsedProof = JSON.parse(merkleProof);
-      
-      // Claim the certificate
-      const receipt = await claimCertificate(contractAddress, parsedProof, tokenURI, signer);
+      let parsedProof;
+      try {
+        parsedProof = JSON.parse(merkleProof);
+      } catch (parseError) {
+        setError('Invalid JSON format for Merkle proof.');
+        setLoading(false);
+        return;
+      }
 
-      setSuccessMsg(`Certificate claimed successfully! Transaction hash: ${receipt.transactionHash}`);
+      const tx = await claimCertificate(contractAddress, parsedProof, signer);
+      console.log('Transaction hash:', tx.hash);
+
+      setSuccessMsg(`🎉 Certificate claimed successfully! Transaction hash: ${tx.hash}`);
       setHasClaimed(true);
       setStep(3);
 
-      // Automatically try to add the certificate to MetaMask
-      setTimeout(async () => {
-        try {
-          await autoAddCertificateToMetaMask(contractAddress, account, provider, eventDetails);
-        } catch (autoAddError) {
-          console.log('Auto-add to MetaMask failed:', autoAddError);
+      // Wait for transaction to be mined
+      const receipt = await tx.wait();
+      console.log('Transaction mined:', receipt);
+
+      // Try to add to MetaMask
+      try {
+        await autoAddCertificateToMetaMask(contractAddress, account, provider);
+        setSuccessMsg(prev => prev + ' Certificate has been added to your MetaMask wallet!');
+      } catch (metamaskError) {
+        console.log('MetaMask add failed:', metamaskError);
           // Don't show error to user as this is optional
         }
-      }, 2000); // Wait 2 seconds for transaction to be processed
+
     } catch (error) {
       console.error('Error claiming certificate:', error);
-      setError('Failed to claim certificate: ' + error.message);
+      if (error.code === 4001) {
+        setError('Transaction was rejected by user.');
+      } else if (error.message.includes('already claimed')) {
+        setError('You have already claimed this certificate.');
+        setHasClaimed(true);
+      } else {
+        setError('Failed to claim certificate. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // Function to view certificates from a contract
+  // Handle viewing certificates
   const handleViewCertificates = async (e) => {
     e.preventDefault();
 
@@ -293,615 +332,432 @@ Debug info:
     }
 
     if (!viewerContractAddress) {
-      setError('Please enter a contract address to view certificates.');
+      setError('Please enter a contract address.');
       return;
     }
 
     setLoadingCertificates(true);
     setError('');
-    setMyCertificates([]);
+    setSuccessMsg('');
 
     try {
-      // Create contract instance
       const contract = new ethers.Contract(viewerContractAddress, [
-        "function hasSoulboundCertificate(address) view returns (bool)",
-        "function getSoulboundCertificateDetails(address) view returns (bool exists, uint256 tokenId, string memory uri)",
-        "function soulboundOwnerOf(uint256) view returns (address)",
-        "function name() view returns (string)",
-        "function symbol() view returns (string)"
+        "function balanceOf(address) view returns (uint256)",
+        "function tokenOfOwnerByIndex(address, uint256) view returns (uint256)",
+        "function tokenURI(uint256) view returns (string)"
       ], provider);
 
-      // Check if user has a certificate
-      const hasCertificate = await contract.hasSoulboundCertificate(account);
+      const balance = await contract.balanceOf(account);
+      console.log('Balance:', balance.toString());
 
-      if (hasCertificate) {
-        // Get certificate details
-        const [exists, tokenId, uri] = await contract.getSoulboundCertificateDetails(account);
-        const contractName = await contract.name();
-        const contractSymbol = await contract.symbol();
-
-        // Fetch metadata from IPFS
-        let metadata = {};
-        if (uri.startsWith('ipfs://')) {
-          try {
-            const ipfsHash = uri.replace('ipfs://', '');
-            const response = await fetch(`https://gateway.pinata.cloud/ipfs/${ipfsHash}`);
-            metadata = await response.json();
-          } catch (metadataError) {
-            console.error('Error fetching metadata:', metadataError);
-            metadata = { name: 'Certificate', description: 'Unable to load metadata' };
-          }
+      const certificates = [];
+      for (let i = 0; i < balance; i++) {
+        try {
+          const tokenId = await contract.tokenOfOwnerByIndex(account, i);
+          const tokenURI = await contract.tokenURI(tokenId);
+          certificates.push({
+            tokenId: tokenId.toString(),
+            tokenURI: tokenURI
+          });
+        } catch (error) {
+          console.error(`Error fetching token ${i}:`, error);
         }
-
-        const certificate = {
-          contractAddress: viewerContractAddress,
-          contractName,
-          contractSymbol,
-          tokenId: tokenId.toString(),
-          uri,
-          metadata,
-          exists
-        };
-
-        setMyCertificates([certificate]);
-        setSuccessMsg(`Found 1 soulbound certificate in your wallet!`);
-      } else {
-        setMyCertificates([]);
-        setSuccessMsg('No certificates found in this contract for your address.');
       }
+
+      setMyCertificates(certificates);
+      setShowViewer(true);
+      setSuccessMsg(`Found ${certificates.length} certificate(s) in your wallet!`);
+
     } catch (error) {
-      console.error('Error viewing certificates:', error);
-      setError('Failed to view certificates: ' + error.message);
+      console.error('Error fetching certificates:', error);
+      setError('Failed to fetch certificates. Please check the contract address.');
     } finally {
       setLoadingCertificates(false);
     }
   };
 
-  // Enhanced function to add soulbound certificate to MetaMask NFT collection
+  // Add certificate to MetaMask
   const addCertificateToMetaMask = async (certificate) => {
     try {
-      const result = await addSoulboundCertificateToMetaMask(certificate);
-      alert(result.message);
-      return result;
+      await addSoulboundCertificateToMetaMask(
+        viewerContractAddress,
+        certificate.tokenId,
+        certificate.tokenURI
+      );
+      setSuccessMsg('Certificate added to MetaMask successfully!');
     } catch (error) {
-      console.error('Error adding certificate to MetaMask:', error);
-      alert(`Error adding certificate to MetaMask: ${error.message}`);
+      console.error('Error adding to MetaMask:', error);
+      setError('Failed to add certificate to MetaMask.');
     }
   };
 
-  // Function to add contract to MetaMask for monitoring
+  // Add contract to MetaMask
   const addContractToMetaMask = async (contractAddress, contractName, contractSymbol) => {
     try {
-      if (!window.ethereum) {
-        alert('MetaMask is not installed!');
-        return;
-      }
-
-      // Add the contract as a custom token (for monitoring purposes)
-      const wasAdded = await window.ethereum.request({
+      await window.ethereum.request({
         method: 'wallet_watchAsset',
         params: {
-          type: 'ERC20', // Use ERC20 type for contract monitoring
+          type: 'ERC721',
           options: {
             address: contractAddress,
+            name: contractName,
             symbol: contractSymbol,
-            decimals: 0,
-            image: 'https://via.placeholder.com/64x64.png?text=SBT', // Soulbound Token icon
-          },
-        },
+            image: 'https://via.placeholder.com/200x200/667eea/ffffff?text=NFT'
+          }
+        }
       });
-
-      if (wasAdded) {
-        alert('🔗 Soulbound Certificate Contract added to MetaMask for monitoring!');
-      }
+      setSuccessMsg('Contract added to MetaMask successfully!');
     } catch (error) {
       console.error('Error adding contract to MetaMask:', error);
-      alert('Error adding contract to MetaMask: ' + error.message);
+      setError('Failed to add contract to MetaMask.');
     }
   };
 
-
-
-  // Function to verify certificate with comprehensive checking
+  // Verify certificate in MetaMask
   const verifyCertificateInMetaMaskLocal = async (certificate) => {
     try {
-      const result = await verifyCertificateInMetaMask(certificate, account);
-
-      if (result.success) {
-        const verificationMessage = `
-🔗 SOULBOUND CERTIFICATE VERIFICATION COMPLETE
-
-✅ Certificate Status: VERIFIED
-✅ Contract: ${result.contractName} (${result.contractSymbol})
-✅ Total Certificates Issued: ${result.totalSupply}
-
-🔍 Ownership Verification:
-✅ Certificate exists: Yes
-✅ Bound to your wallet: ${result.isOwner ? 'YES ✅' : 'NO ❌'}
-✅ You have certificate: ${result.hasCertificate ? 'YES ✅' : 'NO ❌'}
-
-📄 Certificate Details:
-- Token ID: ${certificate.tokenId}
-- Contract Address: ${certificate.contractAddress}
-- Metadata URI: ${result.tokenURI}
-- Certificate Owner: ${result.owner}
-- Your Wallet: ${account}
-- Match: ${result.isOwner ? 'PERFECT MATCH ✅' : 'NO MATCH ❌'}
-
-🔗 Blockchain Links:
-- Contract: ${result.etherscanUrl}
-- Token: ${result.tokenUrl}
-
-🔒 SOULBOUND PROPERTIES:
-- ✅ Permanently bound to your wallet
-- 🚫 Cannot be transferred or sold
-- 🔒 Tamper-proof and immutable
-- ✅ Verifiable by anyone on blockchain
-
-${result.isOwner ? '🎉 CONGRATULATIONS! This certificate is authentically yours!' : '⚠️ This certificate belongs to a different wallet.'}
-        `;
-
-        alert(verificationMessage);
-
-        // Also open Etherscan for additional verification
-        if (result.isOwner) {
-          const openEtherscan = confirm('Would you like to view this certificate on Etherscan for additional verification?');
-          if (openEtherscan) {
-            window.open(result.tokenUrl, '_blank');
-          }
-        }
+      const isValid = await verifyCertificateInMetaMask(
+        viewerContractAddress,
+        certificate.tokenId,
+        certificate.tokenURI
+      );
+      
+      if (isValid) {
+        setSuccessMsg('Certificate verification successful!');
       } else {
-        alert(`❌ VERIFICATION ERROR\n\nUnable to verify certificate: ${result.error}`);
+        setError('Certificate verification failed.');
       }
     } catch (error) {
       console.error('Error verifying certificate:', error);
-      alert(`❌ VERIFICATION ERROR\n\nUnexpected error: ${error.message}`);
+      setError('Failed to verify certificate.');
     }
   };
 
+  if (!account) {
   return (
-    <div className="student-portal">
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2 className="section-heading mb-0">🔗 Soulbound Certificate Portal</h2>
-        {account && (
-          <div className="btn-group" role="group">
-            <button
-              className={`btn ${!showViewer ? 'btn-primary' : 'btn-outline-primary'}`}
-              onClick={() => setShowViewer(false)}
+      <motion.div
+        className="premium-wallet-connect-container"
+        initial={{ opacity: 0, y: 50 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+      >
+        <motion.div 
+          className="card premium-connect-card"
+          whileHover={{ scale: 1.02 }}
+          transition={{ duration: 0.3 }}
+        >
+          <div className="card-body text-center">
+            <motion.div
+              className="connect-icon-container"
+              whileHover={{ rotate: 360 }}
+              transition={{ duration: 0.6 }}
             >
-              Claim Certificate
-            </button>
-            <button
-              className={`btn ${showViewer ? 'btn-success' : 'btn-outline-success'}`}
-              onClick={() => setShowViewer(true)}
+              <Wallet size={64} className="connect-icon" />
+            </motion.div>
+            <h2 className="card-title premium-card-title brand-font">Connect Your Wallet</h2>
+            <p className="card-text premium-card-text body-font">
+              Please connect your MetaMask wallet to access the Student Portal and claim your certificates.
+            </p>
+            <motion.button
+              className="btn btn-primary btn-lg premium-connect-btn body-font"
+              onClick={connectWallet}
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.95 }}
             >
-              View My Certificates
-            </button>
+              <Wallet className="me-2" />
+              Connect Wallet
+              <ArrowRight className="ms-2" />
+            </motion.button>
           </div>
-        )}
-      </div>
-      
-      {!account && (
-        <div className="alert alert-info">
-          <p>Please connect your wallet to claim your certificate.</p>
-          <button 
-            className="btn btn-primary"
-            onClick={connectWallet}
+        </motion.div>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div
+      className="student-portal-container"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
+      {/* Header Section */}
+      <motion.div 
+        className="portal-header premium-portal-header"
+        variants={itemVariants}
+      >
+        <motion.div
+          className="header-content"
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+        >
+          <motion.div
+            className="header-icon-container"
+            whileHover={{ rotate: 360 }}
+            transition={{ duration: 0.6 }}
           >
-            Connect Wallet
-          </button>
-        </div>
-      )}
-      
-      {account && !showViewer && (
-        <div className="row">
-          <div className="col-lg-8 mx-auto">
-            {/* Step 1: Verify Eligibility */}
-            <div className={`card mb-4 ${step !== 1 ? 'd-none' : ''}`}>
-              <div className="card-header bg-primary text-white">
-                <h4 className="mb-0">🔗 Step 1: Verify Your Soulbound Certificate Eligibility</h4>
-                <p className="mb-0 mt-1"><small>Checking if you're eligible for a non-transferable certificate</small></p>
+            <GraduationCap size={48} className="header-icon" />
+          </motion.div>
+          <h1 className="portal-title brand-font">Student Portal</h1>
+          <p className="portal-subtitle body-font">
+            Claim your event certificates as NFTs and manage your digital achievements
+          </p>
+        </motion.div>
+      </motion.div>
+
+      {/* Status Messages */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            className="alert alert-danger premium-alert"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            <AlertCircle className="me-2" />
+            {error}
+          </motion.div>
+        )}
+        {successMsg && (
+          <motion.div
+            className="alert alert-success premium-alert"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            <CheckCircle className="me-2" />
+            {successMsg}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Main Content */}
+      <motion.div 
+        className="row"
+        variants={itemVariants}
+      >
+        {/* Claim Certificate Section */}
+        <motion.div 
+          className="col-lg-8 mb-4"
+          variants={itemVariants}
+        >
+          <motion.div 
+            className="card premium-portal-card"
+            whileHover={{ y: -5 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="card-header premium-card-header">
+              <h3 className="card-title premium-card-title body-font">
+                <Award className="me-2" />
+                Claim Your Certificate
+              </h3>
               </div>
               <div className="card-body">
                 <form onSubmit={handleVerifyEligibility}>
                   <div className="mb-3">
-                    <label htmlFor="contractAddress" className="form-label">Contract Address</label>
+                  <label htmlFor="contractAddress" className="form-label premium-form-label body-font">
+                    Contract Address
+                  </label>
                     <input
                       type="text"
-                      className="form-control"
+                    className="form-control premium-form-control"
                       id="contractAddress"
                       value={contractAddress}
                       onChange={(e) => setContractAddress(e.target.value)}
-                      placeholder="0x..."
+                    placeholder="Enter the certificate contract address"
                       required
                     />
-                    <div className="form-text">Enter the contract address provided by the event organizer.</div>
                   </div>
-                  
                   <div className="mb-3">
-                    <label htmlFor="merkleProof" className="form-label">Your Merkle Proof</label>
+                  <label htmlFor="merkleProof" className="form-label premium-form-label body-font">
+                    Merkle Proof
+                  </label>
                     <textarea
-                      className="form-control"
+                    className="form-control premium-form-control"
                       id="merkleProof"
                       value={merkleProof}
                       onChange={(e) => setMerkleProof(e.target.value)}
-                      placeholder='["0x123...", "0x456..."]'
-                      rows={4}
+                    placeholder="Enter your Merkle proof (JSON format)"
+                    rows="4"
                       required
-                    ></textarea>
-                    <div className="form-text">
-                      <strong>Important:</strong> Enter the Merkle proof specifically for YOUR wallet address ({account}).
-                      The organizer should have provided a JSON file with proofs for each participant.
-                      Find your address in that file and copy the corresponding proof array.
-                      <br />
-                      <strong>Format:</strong> Should be a JSON array like: ["0x123...", "0x456..."]
-                    </div>
-                  </div>
-                  
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={loading || !account}
-                  >
-                    {loading ? 'Verifying...' : 'Verify Eligibility'}
-                  </button>
-                </form>
-
-                <div className="mt-4">
-                  <div className="alert alert-info">
-                    <h6>Need Help?</h6>
-                    <p className="mb-2"><strong>Common Issues:</strong></p>
-                    <ul className="mb-2">
-                      <li>Make sure your wallet address was included in the original participant list</li>
-                      <li>Use the Merkle proof specifically for your address, not someone else's</li>
-                      <li>Check that the JSON format is correct (array of hex strings)</li>
-                      <li>Verify you're connected to the correct network (Sepolia testnet)</li>
-                    </ul>
-                    <p className="mb-0">
-                      <strong>Expected Merkle Proof Format:</strong><br />
-                      <code>["0x1234...", "0x5678...", "0x9abc..."]</code>
-                    </p>
-                  </div>
+                  />
                 </div>
-              </div>
-            </div>
-            
-            {/* Step 2: Claim Certificate */}
-            <div className={`card mb-4 ${step !== 2 ? 'd-none' : ''}`}>
-              <div className="card-header bg-primary text-white">
-                <h4 className="mb-0">🔗 Step 2: Claim Your Soulbound Certificate</h4>
-                <p className="mb-0 mt-1"><small>This certificate will be permanently bound to your wallet address</small></p>
-              </div>
-              <div className="card-body">
+                <motion.button
+                  type="submit"
+                  className="btn btn-primary premium-submit-btn body-font"
+                  disabled={loading}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="me-2 loading-spinner" />
+                      Verifying...
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="me-2" />
+                      Verify Eligibility
+                      <ArrowRight className="ms-2" />
+                    </>
+                  )}
+                </motion.button>
+              </form>
+
+              {/* Event Details */}
                 {eventDetails && (
-                  <div className="mb-4">
-                    <h5 className="card-title">{eventDetails.eventName}</h5>
-                    <p className="card-text">{eventDetails.eventDescription}</p>
-                    <p className="card-text"><small className="text-muted">Date: {eventDetails.eventDate}</small></p>
+                <motion.div
+                  className="event-details premium-event-details"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <h4 className="event-title body-font">
+                    <Sparkles className="me-2" />
+                    Event Details
+                  </h4>
+                  <div className="event-info body-font">
+                    <p><strong>Event Name:</strong> {eventDetails.name}</p>
+                    <p><strong>Event Date:</strong> {eventDetails.date}</p>
+                    <p><strong>Organizer:</strong> {eventDetails.organizer}</p>
                   </div>
-                )}
-                
+                </motion.div>
+              )}
+
+              {/* Claim Button */}
+              {isEligible && !hasClaimed && (
+                <motion.div
+                  className="claim-section"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                >
                 <form onSubmit={handleClaimCertificate}>
-                  <div className="mb-3">
-                    <label htmlFor="tokenURI" className="form-label">Token URI (IPFS or other metadata link)</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      id="tokenURI"
-                      value={tokenURI}
-                      onChange={(e) => setTokenURI(e.target.value)}
-                      placeholder="ipfs://..."
-                      required
-                    />
-                    <div className="form-text">Enter the token URI for your certificate metadata.</div>
-                  </div>
-                  
-                  <div className="d-flex justify-content-between">
-                    <button 
-                      type="button" 
-                      className="btn btn-secondary"
-                      onClick={() => setStep(1)}
-                    >
-                      Back
-                    </button>
-                    <button 
+                    <motion.button
                       type="submit" 
-                      className="btn btn-primary"
-                      disabled={loading || !isEligible || hasClaimed}
+                      className="btn btn-success btn-lg premium-claim-btn body-font"
+                      disabled={loading}
+                      whileHover={{ scale: 1.05, y: -2 }}
+                      whileTap={{ scale: 0.95 }}
                     >
-                      {loading ? 'Claiming...' : 'Claim Certificate'}
-                    </button>
-                  </div>
+                      {loading ? (
+                        <>
+                          <Loader2 className="me-2 loading-spinner" />
+                          Claiming Certificate...
+                        </>
+                      ) : (
+                        <>
+                          <Award className="me-2" />
+                          Claim Certificate
+                          <ArrowRight className="ms-2" />
+                        </>
+                      )}
+                    </motion.button>
                 </form>
-              </div>
+                </motion.div>
+              )}
             </div>
-            
-            {/* Step 3: Success */}
-            <div className={`card mb-4 ${step !== 3 ? 'd-none' : ''}`}>
-              <div className="card-header bg-success text-white">
-                <h4 className="mb-0">🔗 Soulbound Certificate Claimed Successfully!</h4>
-                <p className="mb-0 mt-1"><small>Your certificate is now permanently bound to your wallet</small></p>
-              </div>
-              <div className="card-body text-center">
-                <div className="mb-4">
-                  <div className="display-1 text-success mb-3">🎉</div>
-                  <h5>Congratulations!</h5>
-                  <p>Your <strong>Soulbound Certificate</strong> has been minted and permanently bound to your wallet.</p>
-                  <div className="alert alert-info mt-3">
-                    <h6>🔗 What makes this special?</h6>
-                    <ul className="mb-0">
-                      <li><strong>Non-transferable</strong> - Cannot be sold or moved to another wallet</li>
-                      <li><strong>Permanently yours</strong> - Immutable proof of your achievement</li>
-                      <li><strong>Tamper-proof</strong> - Secured by blockchain technology</li>
-                      <li><strong>Verifiable</strong> - Anyone can verify its authenticity</li>
-                    </ul>
-                  </div>
-                </div>
-                
-                <div className="d-grid gap-2 col-md-8 mx-auto mb-4">
-                  <button
-                    className="btn btn-primary btn-lg"
-                    onClick={() => addCertificateToMetaMask({
-                      contractAddress: contractAddress,
-                      tokenId: '1', // Will be updated with actual token ID
-                      contractName: eventDetails?.name || 'Certificate',
-                      contractSymbol: eventDetails?.symbol || 'CERT'
-                    })}
-                  >
-                    🦊 Add Certificate to MetaMask
-                  </button>
+          </motion.div>
+        </motion.div>
 
-                  <button
-                    className="btn btn-success"
-                    onClick={() => {
-                      setShowViewer(true);
-                      setViewerContractAddress(contractAddress);
-                    }}
-                  >
-                    👀 View My Certificates
-                  </button>
-
-                  <button
-                    type="button"
-                    className="btn btn-outline-primary"
-                    onClick={() => {
-                      setStep(1);
-                      setContractAddress('');
-                      setMerkleProof('');
-                      setTokenURI('');
-                      setIsEligible(false);
-                      setHasClaimed(false);
-                      setEventDetails(null);
-                      setError('');
-                      setSuccessMsg('');
-                    }}
-                  >
-                    Claim Another Certificate
-                  </button>
-                </div>
-              </div>
-            </div>
-            
-            {/* Error and success messages */}
-            {error && (
-              <div className="alert alert-danger mt-3">
-                {error}
-              </div>
-            )}
-            
-            {successMsg && step !== 3 && (
-              <div className="alert alert-success mt-3">
-                {successMsg}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Certificate Viewer Section */}
-      {account && showViewer && (
-        <div className="row">
-          <div className="col-lg-10 mx-auto">
-            {/* Certificate Viewer */}
-            <div className="card mb-4">
-              <div className="card-header bg-success text-white">
-                <h4 className="mb-0">🔗 My Soulbound Certificates</h4>
-                <p className="mb-0 mt-1"><small>View your non-transferable certificates bound to this wallet</small></p>
+        {/* View Certificates Section */}
+        <motion.div 
+          className="col-lg-4 mb-4"
+          variants={itemVariants}
+        >
+          <motion.div 
+            className="card premium-portal-card"
+            whileHover={{ y: -5 }}
+            transition={{ duration: 0.3 }}
+          >
+            <div className="card-header premium-card-header">
+              <h3 className="card-title premium-card-title body-font">
+                <FileText className="me-2" />
+                View Certificates
+              </h3>
               </div>
               <div className="card-body">
-                <form onSubmit={handleViewCertificates} className="mb-4">
+              <form onSubmit={handleViewCertificates}>
                   <div className="mb-3">
-                    <label htmlFor="viewerContractAddress" className="form-label">Contract Address</label>
+                  <label htmlFor="viewerContractAddress" className="form-label premium-form-label body-font">
+                    Contract Address
+                  </label>
                     <input
                       type="text"
-                      className="form-control"
+                    className="form-control premium-form-control"
                       id="viewerContractAddress"
                       value={viewerContractAddress}
                       onChange={(e) => setViewerContractAddress(e.target.value)}
-                      placeholder="0x..."
+                    placeholder="Enter contract address to view certificates"
                       required
                     />
-                    <div className="form-text">Enter the contract address to check for your certificates.</div>
                   </div>
-
-                  <button
+                <motion.button
                     type="submit"
-                    className="btn btn-success"
-                    disabled={loadingCertificates || !account}
-                  >
-                    {loadingCertificates ? 'Searching...' : 'View My Certificates'}
-                  </button>
+                  className="btn btn-outline-primary premium-view-btn body-font"
+                  disabled={loadingCertificates}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  {loadingCertificates ? (
+                    <>
+                      <Loader2 className="me-2 loading-spinner" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="me-2" />
+                      View Certificates
+                      <ArrowRight className="ms-2" />
+                    </>
+                  )}
+                </motion.button>
                 </form>
 
-                {/* Display Certificates */}
-                {myCertificates.length > 0 && (
-                  <div className="certificates-display">
-                    <h5 className="mb-3">Your Soulbound Certificates:</h5>
+              {/* Certificate List */}
+              {showViewer && myCertificates.length > 0 && (
+                <motion.div
+                  className="certificate-list"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <h5 className="certificate-list-title body-font">Your Certificates</h5>
                     {myCertificates.map((cert, index) => (
-                      <div key={index} className="card mb-3 border-success">
-                        <div className="card-body">
-                          <div className="row">
-                            <div className="col-md-8">
-                              <h5 className="card-title">
-                                🔗 {cert.metadata.name || cert.contractName}
-                              </h5>
-                              <p className="card-text">
-                                {cert.metadata.description || 'Soulbound Certificate'}
-                              </p>
-                              <div className="certificate-details">
-                                <p className="mb-1"><strong>Contract:</strong> {cert.contractName} ({cert.contractSymbol})</p>
-                                <p className="mb-1"><strong>Token ID:</strong> {cert.tokenId}</p>
-                                <p className="mb-1"><strong>Contract Address:</strong>
-                                  <code className="ms-2">{cert.contractAddress}</code>
-                                </p>
-                                <p className="mb-1"><strong>Metadata URI:</strong>
-                                  <a href={cert.uri.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')}
-                                     target="_blank"
-                                     rel="noopener noreferrer"
-                                     className="ms-2">
-                                    View on IPFS
-                                  </a>
-                                </p>
+                    <motion.div
+                      key={cert.tokenId}
+                      className="certificate-item premium-certificate-item"
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.3, delay: index * 0.1 }}
+                      whileHover={{ scale: 1.02 }}
+                    >
+                      <div className="certificate-info">
+                        <span className="certificate-id body-font">Token ID: {cert.tokenId}</span>
+                        <span className="certificate-uri body-font">URI: {cert.tokenURI}</span>
                               </div>
-
-                              <div className="alert alert-success mt-3">
-                                <h6>🔗 Soulbound Properties:</h6>
-                                <ul className="mb-0">
-                                  <li>✅ <strong>Permanently bound</strong> to your wallet</li>
-                                  <li>🚫 <strong>Non-transferable</strong> - cannot be sold or moved</li>
-                                  <li>🔒 <strong>Tamper-proof</strong> - secured by blockchain</li>
-                                  <li>✅ <strong>Verifiable</strong> - anyone can verify authenticity</li>
-                                </ul>
-                              </div>
-                            </div>
-
-                            <div className="col-md-4 text-center">
-                              {cert.metadata.image && (
-                                <img
-                                  src={cert.metadata.image.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')}
-                                  alt="Certificate"
-                                  className="img-fluid rounded border"
-                                  style={{maxHeight: '200px'}}
-                                />
-                              )}
-
-                              <div className="mt-3 d-grid gap-2">
-                                <button
-                                  className="btn btn-primary btn-sm"
+                      <div className="certificate-actions">
+                        <motion.button
+                          className="btn btn-sm btn-outline-primary"
                                   onClick={() => addCertificateToMetaMask(cert)}
-                                >
-                                  🦊 Add to MetaMask NFTs
-                                </button>
-
-                                <button
-                                  className="btn btn-success btn-sm"
-                                  onClick={() => verifyCertificateInMetaMaskLocal(cert)}
-                                >
-                                  ✅ Verify in MetaMask
-                                </button>
-
-                                <button
-                                  className="btn btn-outline-info btn-sm"
-                                  onClick={() => addContractToMetaMask(cert.contractAddress, cert.contractName, cert.contractSymbol)}
-                                >
-                                  🔗 Monitor Contract
-                                </button>
-
-                                <div className="btn-group w-100" role="group">
-                                  <button
-                                    className="btn btn-outline-primary btn-sm"
-                                    onClick={() => {
-                                      const contractUrl = `https://sepolia.etherscan.io/address/${cert.contractAddress}#readContract`;
-                                      window.open(contractUrl, '_blank');
-                                    }}
-                                  >
-                                    🔍 Verify Ownership
-                                  </button>
-                                  <button
-                                    className="btn btn-outline-info btn-sm"
-                                    onClick={() => {
-                                      const tokenUrl = `https://sepolia.etherscan.io/token/${cert.contractAddress}?a=${cert.tokenId}`;
-                                      window.open(tokenUrl, '_blank');
-                                    }}
-                                  >
-                                    📊 Token Details
-                                  </button>
-                                </div>
-
-                                <button
-                                  className="btn btn-outline-secondary btn-sm"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(cert.contractAddress);
-                                    alert('Contract address copied to clipboard!');
-                                  }}
-                                >
-                                  📋 Copy Address
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          <ExternalLink size={14} />
+                        </motion.button>
                       </div>
-                    ))}
-                  </div>
-                )}
-
-                {myCertificates.length === 0 && viewerContractAddress && !loadingCertificates && (
-                  <div className="alert alert-info">
-                    <h6>No certificates found</h6>
-                    <p className="mb-0">You don't have any soulbound certificates from this contract address.</p>
-                  </div>
-                )}
-
-                {/* Comprehensive Verification Guide */}
-                <div className="alert alert-info mt-4">
-                  <h6>🔍 How to Verify Your Soulbound Certificate Ownership</h6>
-
-                  <div className="row mt-3">
-                    <div className="col-md-6">
-                      <h6>🎯 Method 1: Use Our Verification (Easiest)</h6>
-                      <ol className="small">
-                        <li>Click <strong>"✅ Verify Certificate"</strong> button above</li>
-                        <li>Automatically checks blockchain ownership</li>
-                        <li>Shows detailed verification results</li>
-                        <li>Most reliable and user-friendly method</li>
-                      </ol>
-                    </div>
-
-                    <div className="col-md-6">
-                      <h6>🔍 Method 2: Etherscan Verification (Most Trusted)</h6>
-                      <ol className="small">
-                        <li>Click <strong>"🔍 Verify Ownership"</strong> button above</li>
-                        <li>Goes to Etherscan contract "Read Contract" tab</li>
-                        <li>Use <code>hasSoulboundCertificate</code> with your address</li>
-                        <li>Should return <code>true</code> if you own it</li>
-                      </ol>
-                    </div>
-                  </div>
-
-                  <div className="mt-3">
-                    <h6>❓ Why Etherscan Shows "0 Holders"</h6>
-                    <p className="small mb-2">
-                      <strong>This is normal for soulbound certificates!</strong> Etherscan counts "holders" based on transfer events,
-                      but soulbound certificates don't use transfers - they're directly minted to recipients.
-                      The certificate still exists and is bound to your wallet.
-                    </p>
-
-                    <h6>✅ Proof of Ownership Methods</h6>
-                    <ul className="small mb-0">
-                      <li><strong>Smart Contract Functions:</strong> Use <code>hasSoulboundCertificate(your_address)</code> → returns <code>true</code></li>
-                      <li><strong>Token Ownership:</strong> Use <code>soulboundOwnerOf(token_id)</code> → returns your address</li>
-                      <li><strong>Certificate Details:</strong> Use <code>getSoulboundCertificateDetails(your_address)</code> → returns certificate info</li>
-                      <li><strong>Transaction History:</strong> Look for your claiming transaction with "SoulboundCertificateIssued" event</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
+                    </motion.div>
+                  ))}
+                </motion.div>
+              )}
             </div>
-          </div>
-        </div>
-      )}
-    </div>
+          </motion.div>
+        </motion.div>
+      </motion.div>
+    </motion.div>
   );
 };
 

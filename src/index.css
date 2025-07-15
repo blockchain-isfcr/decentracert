@@ -1,11 +1,19 @@
+/* Import fonts for premium typography */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P:wght@400&family=DotGothic16:wght@400;500;600;700&display=swap');
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+  font-family: 'DotGothic16', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f8f9fa;
+  /* Dark theme background */
+  background: #000000;
+  background-attachment: fixed;
+  min-height: 100vh;
+  color: #ffffff;
+  overflow-x: hidden; /* Prevent horizontal scroll */
 }
 
 code {
@@ -13,34 +21,43 @@ code {
     monospace;
 }
 
-.card {
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
+/* Brand/Heading Font */
+.brand-font {
+  font-family: 'Press Start 2P', cursive;
 }
 
-.card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+/* Body Text Font */
+.body-font {
+  font-family: 'DotGothic16', sans-serif;
+}
+
+/* Remove conflicting card styles - our premium styles will handle this */
+.card {
+  /* Premium styles are in App.css */
 }
 
 .btn-primary {
-  background-color: #4e54c8;
-  border-color: #4e54c8;
-}
-
-.btn-primary:hover {
-  background-color: #3f43a9;
-  border-color: #3f43a9;
+  /* Premium styles are in App.css */
 }
 
 .navbar {
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  /* Premium styles are in App.css */
 }
 
 .certificate-card {
-  border-radius: 10px;
+  border-radius: 16px;
   overflow: hidden;
   border: none;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.certificate-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
 }
 
 .certificate-img {
@@ -49,19 +66,69 @@ code {
 }
 
 .wallet-address {
-  font-family: monospace;
+  font-family: 'Courier New', monospace;
   font-size: 0.9rem;
-  background-color: #f1f1f1;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
   display: inline-block;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 200px;
   white-space: nowrap;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .form-container {
   max-width: 800px;
   margin: 0 auto;
+}
+
+/* Ensure our premium styles take precedence */
+* {
+  box-sizing: border-box;
+}
+
+/* Fix layout issues */
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  width: 100%;
+}
+
+/* Remove any conflicting Bootstrap styles */
+.bg-light {
+  background: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(10px);
+}
+
+.text-muted {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+/* Dark theme overrides */
+body {
+  background: #000000 !important;
+}
+
+/* Fix zoom and spacing issues */
+@media (max-width: 1200px) {
+  .container {
+    max-width: 100%;
+    padding: 0 15px;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 0 10px;
+  }
 } 

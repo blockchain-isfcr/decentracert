@@ -1,53 +1,38 @@
-# Certificate NFT System for University Clubs & Events
+# Blockchain Certificate System
 
-A fully decentralized Proof of Attendance (PoA) system using NFTs and a Merkle Tree-based whitelist, allowing university event organizers to issue verifiable digital credentials for participants.
+A decentralized certificate system using soulbound NFTs on Ethereum Sepolia testnet.
 
-## Overview
+## Environment Variables
 
-This project implements a complete system where:
+Create a `.env` file in the root directory with the following variables:
 
-- Event organizers can create and deploy attendance NFTs for their events
-- Students can claim these NFTs by proving their eligibility via Merkle proof
-- All certificates are stored on-chain as NFTs on the Ethereum Sepolia testnet
+### Required for Backend (server.js)
+```
+PINATA_JWT=your_pinata_jwt_token
+ETHERSCAN_API_KEY=your_etherscan_api_key
+SEPOLIA_API_URL=https://sepolia.infura.io/v3/your_infura_project_id
+PORT=3001
+```
 
-## Tech Stack
+### Required for Frontend
+```
+REACT_APP_DEPLOYED_CONTRACT_ADDRESS=your_deployed_contract_address
+REACT_APP_SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/your_infura_project_id
+```
 
-- **Frontend**: React for students and organizers
-- **Smart Contract**: Solidity for minting NFTs and verifying Merkle proofs
-- **Blockchain Network**: Ethereum Sepolia Testnet for on-chain deployment and NFT minting
-- **Wallet Integration**: MetaMask for signing and submitting transactions
-- **Metadata Storage**: IPFS / Pinata for storing badge metadata (name, description, image)
-- **Web3 Library**: ethers.js for smart contract interaction from frontend
-- **Security Layer**: Merkle Tree for validating student eligibility for NFT claims
+### Required for Hardhat (deployment)
+```
+SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/your_infura_project_id
+PRIVATE_KEY=your_deployment_private_key
+ETHERSCAN_API_KEY=your_etherscan_api_key
+```
 
-## Features
-
-### Organizer Portal
-- Collect wallet addresses of registered/attending students
-- Upload badge metadata (image, name, description) to IPFS
-- Generate Merkle Tree from the wallet list
-- Deploy or update smart contract with the Merkle root
-
-### Student Portal
-- Connect MetaMask wallet
-- Check eligibility using Merkle proof verification
-- Claim NFT certificate on-chain if eligible
-
-## Setup and Installation
-
-### Prerequisites
-
-1. Node.js and npm installed
-2. MetaMask extension installed in your browser
-3. Sepolia testnet ETH in your wallet (get from a faucet)
-4. Pinata account for IPFS storage
-
-### Installation
+## Installation
 
 1. Clone this repository:
    ```
-   git clone <repository-url>
-   cd certificate-nft-system
+   git clone https://github.com/blockchain-isfcr/decentracert
+   cd decentracert
    ```
 
 2. Install dependencies:

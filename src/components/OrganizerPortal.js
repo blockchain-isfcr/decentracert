@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { generateAllMerkleProofs } from '../utils/merkleUtils';
 import { deployCertificateContractOptimized, deployCertificateContractUltraLow, updateMerkleRoot, updateEventDetails } from '../utils/contractUtils';
 import AnalyticsDashboard from './AnalyticsDashboard';
 import AICertificateGenerator from './AICertificateGenerator';
 import { ethers } from 'ethers';
 import FormData from 'form-data';
+import { Building2 } from 'lucide-react';
 
 const OrganizerPortal = ({ account, provider, signer, connectWallet }) => {
 
@@ -250,11 +252,6 @@ The contract is deployed and working. You can proceed with certificate distribut
       return;
     }
 
-    if (!certificateImage) {
-      setError('Please select a certificate image.');
-      return;
-    }
-
     setLoading(true);
     setError('');
     setSuccessMsg('');
@@ -268,12 +265,7 @@ The contract is deployed and working. You can proceed with certificate distribut
       const metadataHash = await uploadMetadataToPinata(imageHash);
       setMetadataHash(metadataHash);
 
-      console.log('✅ Regular Upload Complete:');
-      console.log('- Image Hash:', imageHash);
-      console.log('- Metadata Hash:', metadataHash);
-      console.log('- Gateway URL:', `https://gateway.pinata.cloud/ipfs/${imageHash}`);
-
-      // Auto-download the token URI file
+      // Auto-download the token URI JSON file
       setTimeout(() => {
         const tokenURI = `ipfs://${metadataHash}`;
         const tokenData = {
@@ -303,8 +295,11 @@ The contract is deployed and working. You can proceed with certificate distribut
         setTimeout(() => URL.revokeObjectURL(url), 100);
       }, 500);
 
-      setSuccessMsg(`Image and metadata uploaded to IPFS and token URI downloaded successfully!`);
+      setSuccessMsg('Certificate image and metadata uploaded to IPFS successfully!');
+
+      // Auto-proceed to deploy step
       setStep(4);
+      setSuccessMsg(prevMsg => prevMsg + '\n\n🚀 Ready to deploy contract!');
     } catch (error) {
       console.error('Error uploading to IPFS:', error);
       setError('Failed to upload to IPFS: ' + error.message);
@@ -313,7 +308,7 @@ The contract is deployed and working. You can proceed with certificate distribut
     }
   };
 
-  // Handle deploying the contract
+  // Handle contract deployment
   const handleDeployContract = async (e) => {
     e.preventDefault();
 
@@ -322,34 +317,8 @@ The contract is deployed and working. You can proceed with certificate distribut
       return;
     }
 
-    if (!merkleRoot) {
-      setError('Please generate a Merkle root first.');
-      return;
-    }
-
-    if (!uploadedImageHash) {
-      setError('Please upload a certificate image first.');
-      return;
-    }
-
-    // Validate required fields
-    if (!eventName.trim()) {
-      setError('Please enter an event name.');
-      return;
-    }
-
-    if (!eventSymbol.trim()) {
-      setError('Please enter an event symbol.');
-      return;
-    }
-
-    if (!eventDescription.trim()) {
-      setError('Please enter an event description.');
-      return;
-    }
-
-    if (!eventDate) {
-      setError('Please select an event date.');
+    if (!merkleRoot || !uploadedImageHash || !metadataHash) {
+      setError('Please complete all previous steps first.');
       return;
     }
 
@@ -358,192 +327,87 @@ The contract is deployed and working. You can proceed with certificate distribut
     setSuccessMsg('');
 
     try {
-      console.log('Starting deployment process...');
+      // Check gas prices
+      const gasPrice = await checkGasPrices();
+      
+      let contractAddress;
+      
+      if (deploymentMode === 'cheap') {
+        contractAddress = await deployCertificateContractUltraLow(
+          signer,
+          eventName,
+          eventSymbol,
+          merkleRoot,
+          `ipfs://${metadataHash}`,
+          gasPrice
+        );
+      } else {
+        contractAddress = await deployCertificateContractOptimized(
+          signer,
+          eventName,
+          eventSymbol,
+          merkleRoot,
+          `ipfs://${metadataHash}`,
+          gasPrice
+        );
+      }
 
-      // Prepare event details
-      const eventDetails = {
-        name: eventName.trim(),
-        symbol: eventSymbol.trim().toUpperCase(),
-        eventName: eventName.trim(),
-        eventDescription: eventDescription.trim(),
-        eventDate: eventDate,
-        eventImageURI: `ipfs://${uploadedImageHash}`
-      };
+      setDeployedContract(contractAddress);
+      setContractAddress(contractAddress);
 
-      console.log('Prepared event details:', eventDetails);
-
-      // Deploy contract with selected mode
-      console.log(`🚀 Starting contract deployment in ${deploymentMode} mode...`);
-      const contract = deploymentMode === 'cheap'
-        ? await deployCertificateContractUltraLow(eventDetails, merkleRoot, signer)
-        : await deployCertificateContractOptimized(eventDetails, merkleRoot, signer);
-
-      console.log('✅ Contract deployed successfully!');
-      console.log('Contract address:', contract.address);
-      console.log('Deployment transaction:', contract.deployTransaction?.hash);
-
-      setDeployedContract(contract.address);
-
-      // Auto-download comprehensive certificate data file
+      // Auto-download comprehensive data file
       setTimeout(() => {
-        const certificateData = {
+        const comprehensiveData = {
+          contractAddress: contractAddress,
           eventDetails: {
-            name: eventDetails.name,
-            symbol: eventDetails.symbol,
-            description: eventDetails.description,
-            date: eventDetails.date
-          },
-          blockchain: {
-            network: "Sepolia Testnet",
-            contractAddress: contract.address,
-            merkleRoot: merkleRoot,
-            deployedAt: new Date().toISOString(),
-            deploymentTxHash: contract.deployTransaction?.hash || 'N/A'
-          },
-          ipfs: {
-            tokenURI: `ipfs://${metadataHash}`,
-            imageHash: uploadedImageHash,
-            metadataHash: metadataHash
-          },
-          merkleProofs: merkleProofs,
-          instructions: {
-            forOrganizers: [
-              "1. Share the contract address with participants",
-              "2. Distribute the Merkle proofs to eligible participants",
-              "3. Participants can claim certificates using the Student Portal"
-            ],
-            forStudents: [
-              "1. Go to Student Portal",
-              "2. Enter the contract address",
-              "3. Find your address in merkleProofs section",
-              "4. Copy your specific proof array (e.g., [\"0x123...\", \"0x456...\"])",
-              "5. Paste the proof array in Student Portal",
-              "6. Verify eligibility and claim certificate"
-            ]
-          },
-          generatedAt: new Date().toISOString()
-        };
-
-        const jsonData = JSON.stringify(certificateData, null, 2);
-        const blob = new Blob([jsonData], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `certificate-complete-${eventName || 'event'}-${Date.now()}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        setTimeout(() => URL.revokeObjectURL(url), 100);
-      }, 1000); // Delay to ensure contract address is set
-
-      setSuccessMsg(`Contract deployed successfully at address ${contract.address}. Complete certificate data downloaded!`);
-      setStep(5); // Move to step 5 to show success
-    } catch (error) {
-      console.error('Error deploying contract:', error);
-
-      // Check if this is a TRANSACTION_REPLACED error with successful deployment
-      if (error.code === 'TRANSACTION_REPLACED' && error.replacement && error.replacement.hash) {
-        console.log('🔄 Transaction was repriced but may have succeeded');
-        console.log('Replacement transaction:', error.replacement);
-
-        // Check if the replacement transaction was successful
-        if (error.receipt && error.receipt.status === 1 && error.receipt.contractAddress) {
-          console.log('✅ Contract deployed successfully despite repricing!');
-          console.log('Contract address:', error.receipt.contractAddress);
-
-          // Double-check that the contract actually exists
-          const contractExists = await verifyContractDeployment(error.receipt.contractAddress);
-          console.log('Contract verification:', contractExists ? 'EXISTS' : 'NOT FOUND');
-
-          // Treat as successful deployment
-          setDeployedContract(error.receipt.contractAddress);
-
-          // Auto-download comprehensive certificate data file
-          setTimeout(() => {
-            const certificateData = {
-              eventDetails: {
-                name: eventName.trim(),
-                symbol: eventSymbol.trim().toUpperCase(),
-                description: eventDescription.trim(),
+            name: eventName,
+            symbol: eventSymbol,
+            description: eventDescription,
                 date: eventDate
               },
-              blockchain: {
-                network: "Sepolia Testnet",
-                contractAddress: error.receipt.contractAddress,
                 merkleRoot: merkleRoot,
-                deployedAt: new Date().toISOString(),
-                deploymentTxHash: error.replacement.hash || error.receipt.transactionHash
-              },
-              ipfs: {
+          merkleProofs: merkleProofs,
                 tokenURI: `ipfs://${metadataHash}`,
                 imageHash: uploadedImageHash,
-                metadataHash: metadataHash
-              },
-              merkleProofs: merkleProofs,
-              instructions: {
-                forOrganizers: [
-                  "1. Share the contract address with participants",
-                  "2. Distribute the Merkle proofs to eligible participants",
-                  "3. Participants can claim certificates using the Student Portal"
-                ],
-                forStudents: [
-                  "1. Go to Student Portal",
-                  "2. Enter the contract address",
-                  "3. Find your address in merkleProofs section",
-                  "4. Copy your specific proof array (e.g., [\"0x123...\", \"0x456...\"])",
-                  "5. Paste the proof array in Student Portal",
-                  "6. Verify eligibility and claim certificate"
-                ]
-              },
-              generatedAt: new Date().toISOString()
-            };
+          metadataHash: metadataHash,
+          deploymentMode: deploymentMode,
+          gasPrice: gasPrice,
+          deployedAt: new Date().toISOString(),
+          issuer: account
+        };
 
-            const jsonData = JSON.stringify(certificateData, null, 2);
+        const jsonData = JSON.stringify(comprehensiveData, null, 2);
             const blob = new Blob([jsonData], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
 
             const link = document.createElement('a');
             link.href = url;
-            link.download = `certificate-complete-${eventName || 'event'}-${Date.now()}.json`;
+        link.download = `certificate-data-${eventName || 'event'}-${Date.now()}.json`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
 
             setTimeout(() => URL.revokeObjectURL(url), 100);
-          }, 1000);
+      }, 500);
 
-          setSuccessMsg(`✅ Contract deployed successfully at address ${error.receipt.contractAddress}!
+      setSuccessMsg(`✅ Contract deployed successfully!
 
-🔄 Note: Transaction was repriced during deployment but completed successfully.
-📄 Complete certificate data downloaded!`);
-          setStep(5);
-          return; // Exit the catch block
-        }
-      }
+Contract Address: ${contractAddress}
+Network: ${networkName || 'Unknown'}
 
-      // Handle other errors
-      let errorMessage = error.message;
-      if (error.message.includes('insufficient funds')) {
-        errorMessage = 'Insufficient funds. You need Sepolia ETH to deploy the contract. Get some from a Sepolia faucet.';
-      } else if (error.message.includes('user rejected')) {
-        errorMessage = 'Transaction was rejected. Please try again and confirm the transaction in MetaMask.';
-      } else if (error.message.includes('network')) {
-        errorMessage = 'Network error. Please check your connection and make sure you\'re connected to Sepolia testnet.';
-      } else if (error.code === 'TRANSACTION_REPLACED') {
-        errorMessage = 'Transaction was replaced due to gas price changes. Please check your wallet for the transaction status and try again if needed.';
-      }
+A comprehensive data file has been downloaded with all the information needed for certificate distribution.`);
 
-      setError('Failed to deploy contract: ' + errorMessage);
+      setStep(5);
+    } catch (error) {
+      console.error('Error deploying contract:', error);
+      setError('Failed to deploy contract: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Upload custom metadata to IPFS via backend API
+  // Upload custom metadata to IPFS
   const uploadCustomMetadataToPinata = async (metadata, eventName) => {
-    try {
       const response = await fetch('/api/upload-metadata', {
         method: 'POST',
         headers: {
@@ -559,180 +423,122 @@ The contract is deployed and working. You can proceed with certificate distribut
 
       const result = await response.json();
       return result.ipfsHash;
-    } catch (error) {
-      console.error('Error uploading custom metadata to IPFS:', error);
-      throw error;
-    }
   };
 
-  // Upload AI-generated data URL to IPFS via backend API
+  // Upload AI image to IPFS via backend API
   const uploadAIImageToPinata = async (dataUrl, eventName) => {
     try {
+      console.log('🤖 Starting AI image upload to IPFS...');
+      
       // Convert data URL to blob
       const response = await fetch(dataUrl);
       const blob = await response.blob();
 
-      // Create form data
+      // Create file from blob
+      const file = new File([blob], `${eventName}-ai-certificate.png`, { type: 'image/png' });
+      
       const formData = new FormData();
-      formData.append('file', blob, `${eventName}-ai-certificate.png`);
+      formData.append('file', file);
 
       const metadata = {
-        name: `${eventName}-ai-certificate-image`,
+        name: `${eventName}-ai-certificate`,
       };
       formData.append('metadata', JSON.stringify(metadata));
 
+      console.log('📤 Sending AI image to server...');
       const uploadResponse = await fetch('/api/upload-ipfs', {
         method: 'POST',
         body: formData,
       });
 
       if (!uploadResponse.ok) {
-        const errorData = await uploadResponse.json();
-        throw new Error(errorData.error || 'Failed to upload AI image to IPFS');
+        const errorText = await uploadResponse.text();
+        console.error('❌ Server response error:', errorText);
+        
+        let errorMessage = 'Failed to upload AI certificate to IPFS';
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorMessage;
+        } catch (parseError) {
+          console.error('❌ Could not parse error response:', parseError);
+          errorMessage = `Server error: ${uploadResponse.status} ${uploadResponse.statusText}`;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const result = await uploadResponse.json();
+      console.log('✅ AI image uploaded successfully:', result.ipfsHash);
       return result.ipfsHash;
     } catch (error) {
-      console.error('Error uploading AI image to IPFS:', error);
-      throw error;
+      console.error('❌ Error uploading AI image to IPFS:', error);
+      throw new Error(`Failed to upload AI certificate: ${error.message}`);
     }
   };
 
-  // Handle AI-generated certificate
+  // Handle AI certificate generation
   const handleAICertificateGenerated = async (certificateData) => {
-    console.log('🎯 handleAICertificateGenerated called');
-    console.log('📦 Certificate data received:', certificateData);
-
     try {
       setLoading(true);
       setError('');
 
-      // Validate certificate data structure
-      if (!certificateData) {
-        throw new Error('No certificate data received');
-      }
-
-      if (!certificateData.design || !certificateData.design.imageUrl) {
-        throw new Error('No certificate image found in data');
-      }
-
-      if (!certificateData.metadata) {
-        throw new Error('No certificate metadata found in data');
-      }
-
-      console.log('✅ Certificate data validation passed');
-
-      // Auto-fill the form with AI-generated data
-      if (certificateData && certificateData.metadata) {
-        // Extract event details from certificate_data.event (original data)
-        const originalEventData = certificateData.metadata.certificate_data?.event;
-        const eventName = originalEventData?.name || certificateData.metadata.name?.replace(' - Certificate', '') || '';
-        const eventDescription = originalEventData?.description || '';
-        const eventDate = originalEventData?.date || '';
-        const eventCategory = originalEventData?.category || 'academic';
-
-        console.log('📝 Extracted event details:');
-        console.log('- Event Name:', eventName);
-        console.log('- Event Description:', eventDescription);
-        console.log('- Event Date:', eventDate);
-        console.log('- Event Category:', eventCategory);
-
-        setEventName(eventName);
-        setEventDescription(eventDescription);
-
-        // Auto-generate symbol from event name
-        const autoSymbol = eventName
-          .split(' ')
-          .map(word => word.charAt(0))
-          .join('')
-          .toUpperCase()
-          .slice(0, 6) + '-SBT';
-        setEventSymbol(autoSymbol);
-
-        // Set date if available
-        if (eventDate) {
-          setEventDate(eventDate);
-        }
-
         // Upload AI-generated image to IPFS
-        console.log('📤 Uploading AI-generated image to IPFS...');
-        const imageHash = await uploadAIImageToPinata(certificateData.design.imageUrl, eventName);
+      const imageHash = await uploadAIImageToPinata(certificateData.imageDataUrl, certificateData.eventName);
         setUploadedImageHash(imageHash);
 
-        // Create metadata with proper IPFS gateway URL for MetaMask compatibility
-        console.log('📤 Creating metadata with gateway URL...');
+      // Create metadata for AI certificate
         const metadata = {
-          name: eventName,
-          description: eventDescription,
-          image: `https://gateway.pinata.cloud/ipfs/${imageHash}`, // Use gateway URL instead of ipfs://
+        name: certificateData.eventName,
+        description: certificateData.description,
+        image: `https://gateway.pinata.cloud/ipfs/${imageHash}`,
           external_url: `https://gateway.pinata.cloud/ipfs/${imageHash}`,
           attributes: [
             {
-              trait_type: "Event Name",
-              value: eventName
+            trait_type: "Event",
+            value: certificateData.eventName
             },
             {
-              trait_type: "Event Date",
-              value: eventDate || new Date().toISOString().split('T')[0]
+            trait_type: "Date",
+            value: certificateData.eventDate
             },
             {
-              trait_type: "Certificate Type",
-              value: "Soulbound"
+            trait_type: "Issuer",
+            value: account
             },
             {
-              trait_type: "Generated By",
-              value: "AI Certificate Generator"
+            trait_type: "Certificate Type",
+            value: "AI-Generated Soulbound"
             },
             {
-              trait_type: "Category",
-              value: eventCategory || "Professional Development"
+            trait_type: "AI Generated",
+            value: "Yes"
             }
           ]
         };
 
         // Upload metadata to IPFS
-        console.log('📤 Uploading metadata to IPFS...');
-        const metadataHash = await uploadCustomMetadataToPinata(metadata, eventName);
+      const metadataHash = await uploadCustomMetadataToPinata(metadata, certificateData.eventName);
         setMetadataHash(metadataHash);
 
-        console.log('✅ AI Certificate Integration Complete:');
-        console.log('- Image Hash:', imageHash);
-        console.log('- Metadata Hash:', metadataHash);
-        console.log('- Image Preview:', certificateData.design.imageUrl.substring(0, 50) + '...');
-        console.log('- Gateway URL:', `https://gateway.pinata.cloud/ipfs/${imageHash}`);
-        console.log('- Metadata:', metadata);
+      // Update form fields with AI-generated data
+      setEventName(certificateData.eventName);
+      setEventSymbol(certificateData.eventSymbol);
+      setEventDescription(certificateData.description);
+      setEventDate(certificateData.eventDate);
+      setImagePreview(certificateData.imageDataUrl);
 
-        // Set image preview to the AI-generated image (data URL)
-        setImagePreview(certificateData.design.imageUrl);
-
-        // Show success message
-        setSuccessMsg(`🎉 AI certificate generated and uploaded successfully!
-
-✅ Event details auto-filled
-✅ Certificate design uploaded to IPFS
-✅ Metadata created and uploaded
-✅ Ready for participant addresses and deployment
-
-Please proceed to add participant wallet addresses.`);
-
-        // Switch to create tab and go to step 1 (to add addresses)
+      setSuccessMsg('🎉 AI Certificate generated and uploaded successfully!');
         setActiveTab('create');
-        setStep(1); // Start from step 1 but with pre-filled data
-      }
+      setStep(1);
     } catch (error) {
-      console.error('❌ Error processing AI certificate:', error);
-      console.error('Error details:', error);
-      setError('Failed to upload AI certificate to IPFS: ' + error.message);
-
-      // Show user-friendly error message
-      alert(`Error processing AI certificate: ${error.message}\n\nPlease try again or check the console for details.`);
+      console.error('Error handling AI certificate:', error);
+      setError('Failed to process AI certificate: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle updating an existing contract
+  // Handle contract updates
   const handleUpdateContract = async (e) => {
     e.preventDefault();
     
@@ -741,8 +547,8 @@ Please proceed to add participant wallet addresses.`);
       return;
     }
 
-    if (!contractAddress) {
-      setError('Please enter a contract address.');
+    if (!contractAddress || !ethers.utils.isAddress(contractAddress)) {
+      setError('Please enter a valid contract address.');
       return;
     }
 
@@ -751,24 +557,15 @@ Please proceed to add participant wallet addresses.`);
     setSuccessMsg('');
 
     try {
-      // Update Merkle root if provided
       if (merkleRoot) {
-        await updateMerkleRoot(contractAddress, merkleRoot, signer);
+        await updateMerkleRoot(signer, contractAddress, merkleRoot);
+        setSuccessMsg('Merkle root updated successfully!');
       }
-      
-      // Update event details if provided
-      if (eventName || eventDescription || eventDate || uploadedImageHash) {
-        const eventDetails = {
-          eventName: eventName,
-          eventDescription: eventDescription,
-          eventDate: eventDate,
-          eventImageURI: uploadedImageHash ? `ipfs://${uploadedImageHash}` : ''
-        };
-        
-        await updateEventDetails(contractAddress, eventDetails, signer);
+
+      if (eventName && eventSymbol && eventDescription && eventDate) {
+        await updateEventDetails(signer, contractAddress, eventName, eventSymbol, eventDescription, eventDate);
+        setSuccessMsg(prevMsg => prevMsg + '\nEvent details updated successfully!');
       }
-      
-      setSuccessMsg('Contract updated successfully!');
     } catch (error) {
       console.error('Error updating contract:', error);
       setError('Failed to update contract: ' + error.message);
@@ -777,75 +574,205 @@ Please proceed to add participant wallet addresses.`);
     }
   };
 
-
-
-  // Render JSON data for download (manual backup)
+  // Render Merkle proofs JSON
   const renderMerkleProofsJSON = () => {
-    if (!merkleProofs || !merkleRoot) return null;
-
-    const jsonData = JSON.stringify({ merkleRoot, proofs: merkleProofs }, null, 2);
-    const blob = new Blob([jsonData], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
+    if (!merkleProofs) return null;
 
     return (
-      <div className="mb-3">
-        <a
-          href={url}
-          download={`merkle-proofs-${Date.now()}.json`}
-          className="btn btn-outline-success"
-        >
-          📥 Download Again
-        </a>
+      <div className="alert alert-info">
+        <strong>Generated Proofs:</strong>
+        <pre className="mt-2" style={{ fontSize: '0.8rem', maxHeight: '200px', overflow: 'auto' }}>
+          {JSON.stringify(merkleProofs, null, 2)}
+        </pre>
       </div>
     );
   };
 
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.2
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 30 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.6,
+        ease: "easeOut"
+      }
+    }
+  };
+
+  const cardVariants = {
+    hidden: { opacity: 0, scale: 0.9 },
+    visible: {
+      opacity: 1,
+      scale: 1,
+      transition: {
+        duration: 0.5,
+        ease: "easeOut"
+      }
+    }
+  };
+
+  const buttonVariants = {
+    hover: { 
+      scale: 1.05, 
+      y: -2,
+      boxShadow: "0 8px 25px rgba(139, 92, 246, 0.4)"
+    },
+    tap: { scale: 0.95 }
+  };
+
   return (
-    <div className="organizer-portal">
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <h2 className="section-heading mb-0">🏛️ Organizer Portal</h2>
+    <motion.div 
+      className="organizer-portal"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.6, ease: "easeOut" }}
+    >
+      {/* Header Section */}
+      <motion.div 
+        className="portal-header premium-portal-header"
+        variants={itemVariants}
+      >
+        <motion.div
+          className="header-content"
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+        >
+          <motion.div
+            className="header-icon-container"
+            whileHover={{ rotate: 360 }}
+            transition={{ duration: 0.6 }}
+          >
+            <Building2 size={48} className="header-icon" />
+          </motion.div>
+          <h1 className="portal-title brand-font">Organizer Portal</h1>
+          <p className="portal-subtitle body-font">
+            Create and manage soulbound certificates for your events with advanced analytics and AI tools
+          </p>
+          
+          {/* Progress Bar Section */}
+          {account && activeTab === 'create' && (
+            <motion.div 
+              className="progress-section mt-4"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.4 }}
+            >
+              <div className="progress premium-progress">
+                <div
+                  className="progress-bar premium-progress-bar"
+                  role="progressbar"
+                  style={{width: `${step * 25}%`}}
+                  aria-valuenow={step * 25}
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                >
+                  Step {step} of 4
+                </div>
+              </div>
+
+              <div className="d-flex justify-content-between mt-3 flex-wrap">
+                <small className={uploadedImageHash ? 'text-success fw-bold' : ''}>
+                  {uploadedImageHash ? '✅ Event Details (AI)' : 'Event Details'}
+                </small>
+                <small className={step >= 2 ? 'text-primary fw-bold' : ''}>Generate Proofs</small>
+                <small className={uploadedImageHash ? 'text-success fw-bold' : step >= 3 ? 'text-primary fw-bold' : ''}>
+                  {uploadedImageHash ? '✅ AI Assets' : 'Upload Assets'}
+                </small>
+                <small className={step >= 4 ? 'text-primary fw-bold' : ''}>Deploy Contract</small>
+              </div>
+
+              {uploadedImageHash && (
+                <div className="mt-2">
+                  <small className="text-success">
+                    🤖 AI Certificate Generated - Image upload step skipped
+                  </small>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </motion.div>
+      </motion.div>
+
+      {/* Tab Navigation */}
         {account && (
-          <div className="btn-group" role="group">
-            <button
-              className={`btn ${activeTab === 'create' ? 'btn-primary' : 'btn-outline-primary'}`}
+        <motion.div 
+          className="mb-2"
+          variants={itemVariants}
+        >
+          <div className="btn-group w-100 mb-2 premium-tab-group" role="group">
+            <motion.button
+              className={`btn premium-tab-btn ${activeTab === 'create' ? 'btn-primary' : 'btn-outline-primary'}`}
               onClick={() => setActiveTab('create')}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
               📝 Create Certificates
-            </button>
-            <button
-              className={`btn ${activeTab === 'analytics' ? 'btn-success' : 'btn-outline-success'}`}
+            </motion.button>
+            <motion.button
+              className={`btn premium-tab-btn ${activeTab === 'analytics' ? 'btn-primary' : 'btn-outline-primary'}`}
               onClick={() => setActiveTab('analytics')}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
               📊 Analytics Dashboard
-            </button>
-            <button
-              className={`btn ${activeTab === 'ai-generator' ? 'btn-warning' : 'btn-outline-warning'}`}
+            </motion.button>
+            <motion.button
+              className={`btn premium-tab-btn ${activeTab === 'ai-generator' ? 'btn-primary' : 'btn-outline-primary'}`}
               onClick={() => setActiveTab('ai-generator')}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
               🤖 AI Certificate Generator
-            </button>
+            </motion.button>
           </div>
+        </motion.div>
         )}
-      </div>
 
+      {/* Wallet Connection Alert */}
       {!account && (
-        <div className="alert alert-info">
-          <p>Please connect your wallet to create and manage certificates.</p>
-          <button
+        <motion.div 
+          className="alert alert-info mt-2"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+        >
+          <p className="mb-2">Please connect your wallet to create and manage certificates.</p>
+          <motion.button
             className="btn btn-primary"
             onClick={connectWallet}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
             Connect Wallet
-          </button>
-        </div>
+          </motion.button>
+        </motion.div>
       )}
 
       {/* Analytics Dashboard Tab */}
       {account && activeTab === 'analytics' && (
-        <div>
-          <div className="card mb-4">
+        <motion.div 
+          className="row mt-2"
+          variants={itemVariants}
+        >
+          <div className="col-lg-10 mx-auto">
+            <div className="card mb-3">
             <div className="card-header">
-              <h5>📊 Certificate Analytics</h5>
+                <h5 className="mb-0">📊 Certificate Analytics</h5>
             </div>
             <div className="card-body">
               <div className="mb-3">
@@ -873,56 +800,31 @@ Please proceed to add participant wallet addresses.`);
             />
           )}
         </div>
+        </motion.div>
       )}
 
       {/* AI Certificate Generator Tab */}
       {account && activeTab === 'ai-generator' && (
-        <div>
+        <motion.div 
+          className="row mt-2"
+          variants={itemVariants}
+        >
+          <div className="col-lg-10 mx-auto">
           <AICertificateGenerator onCertificateGenerated={handleAICertificateGenerated} />
         </div>
+        </motion.div>
       )}
 
       {/* Create Certificates Tab */}
       {account && activeTab === 'create' && (
-        <div className="row">
-          <div className="col-lg-8 mx-auto">
-            {/* Step navigation */}
-            <div className="mb-4">
-              <div className="progress">
-                <div
-                  className="progress-bar"
-                  role="progressbar"
-                  style={{width: `${step * 25}%`}}
-                  aria-valuenow={step * 25}
-                  aria-valuemin="0"
-                  aria-valuemax="100"
-                >
-                  Step {step} of 4
-                </div>
-              </div>
-
-              <div className="d-flex justify-content-between mt-2">
-                <small className={uploadedImageHash ? 'text-success fw-bold' : ''}>
-                  {uploadedImageHash ? '✅ Event Details (AI)' : 'Event Details'}
-                </small>
-                <small className={step >= 2 ? 'text-primary fw-bold' : ''}>Generate Proofs</small>
-                <small className={uploadedImageHash ? 'text-success fw-bold' : step >= 3 ? 'text-primary fw-bold' : ''}>
-                  {uploadedImageHash ? '✅ AI Assets' : 'Upload Assets'}
-                </small>
-                <small className={step >= 4 ? 'text-primary fw-bold' : ''}>Deploy Contract</small>
-              </div>
-
-              {uploadedImageHash && (
-                <div className="mt-2">
-                  <small className="text-success">
-                    🤖 AI Certificate Generated - Image upload step skipped
-                  </small>
-                </div>
-              )}
-            </div>
+        <motion.div 
+          className="row mt-2"
+          variants={itemVariants}
+        >
+          <div className="col-lg-10 mx-auto">
             
             {/* Step 1: Event Details */}
-            <div className={`card mb-4 ${step !== 1 ? 'd-none' : ''}`}>
+            <div className={`card ${step !== 1 ? 'd-none' : ''}`}>
               <div className="card-header bg-primary text-white">
                 <h4 className="mb-0">Step 1: Event Details & Participant Addresses</h4>
                 {uploadedImageHash && (
@@ -960,7 +862,8 @@ Please proceed to add participant wallet addresses.`);
                 )}
 
                 <form onSubmit={handleCreateMerkleRoot}>
-                  <div className="mb-3">
+                  <div className="row">
+                    <div className="col-md-6 mb-3">
                     <label htmlFor="eventName" className="form-label">Event Name</label>
                     <input
                       type="text"
@@ -973,7 +876,7 @@ Please proceed to add participant wallet addresses.`);
                     />
                   </div>
                   
-                  <div className="mb-3">
+                    <div className="col-md-6 mb-3">
                     <label htmlFor="eventSymbol" className="form-label">Certificate Symbol</label>
                     <input
                       type="text"
@@ -985,6 +888,7 @@ Please proceed to add participant wallet addresses.`);
                       required
                     />
                     <div className="form-text">Short symbol for your certificate (like a stock ticker).</div>
+                    </div>
                   </div>
                   
                   <div className="mb-3">
@@ -1026,6 +930,7 @@ Please proceed to add participant wallet addresses.`);
                     <div className="form-text">Enter one Ethereum wallet address per line. These addresses will be eligible to claim the certificate.</div>
                   </div>
                   
+                  <div className="text-center">
                   <button 
                     type="submit" 
                     className="btn btn-primary"
@@ -1033,12 +938,13 @@ Please proceed to add participant wallet addresses.`);
                   >
                     {loading ? 'Processing...' : 'Generate Merkle Proofs'}
                   </button>
+                  </div>
                 </form>
               </div>
             </div>
             
             {/* Step 2: Merkle Proofs */}
-            <div className={`card mb-4 ${step !== 2 ? 'd-none' : ''}`}>
+            <div className={`card ${step !== 2 ? 'd-none' : ''}`}>
               <div className="card-header bg-primary text-white">
                 <h4 className="mb-0">Step 2: Merkle Root & Proofs</h4>
               </div>
@@ -1085,7 +991,7 @@ Please proceed to add participant wallet addresses.`);
             </div>
             
             {/* Step 3: Upload Certificate Image */}
-            <div className={`card mb-4 ${step !== 3 ? 'd-none' : ''}`}>
+            <div className={`card ${step !== 3 ? 'd-none' : ''}`}>
               <div className="card-header bg-primary text-white">
                 <h4 className="mb-0">Step 3: Upload Certificate Image</h4>
               </div>
@@ -1143,7 +1049,7 @@ Please proceed to add participant wallet addresses.`);
                       <p className="mb-1"><strong>Metadata IPFS Hash:</strong> {metadataHash}</p>
                       <p className="mb-1"><strong>Token URI:</strong> ipfs://{metadataHash}</p>
                       <p className="mb-1"><small>✅ <strong>Auto-Downloaded:</strong> token-uri-{eventName || 'event'}-[timestamp].json</small></p>
-                      <p className="mb-0"><small>💡 <strong>Note:</strong> A comprehensive file with all data will be downloaded after contract deployment.</small></p>
+                      <p className="mb-1"><small>💡 <strong>Note:</strong> A comprehensive file with all data will be downloaded after contract deployment.</small></p>
                     </div>
 
                     <div className="d-flex justify-content-between align-items-center">
@@ -1196,130 +1102,53 @@ Please proceed to add participant wallet addresses.`);
             </div>
             
             {/* Step 4: Deploy Contract */}
-            <div className={`card mb-4 ${step !== 4 ? 'd-none' : ''}`}>
+            <div className={`card ${step !== 4 ? 'd-none' : ''}`}>
               <div className="card-header bg-primary text-white">
-                <h4 className="mb-0">Step 4: Deploy Contract</h4>
+                <h4 className="mb-0">Step 4: Deploy Smart Contract</h4>
               </div>
               <div className="card-body">
-                <div className="mb-4">
-                  <h5>Deploy New Contract</h5>
-                  <p>Deploy a new certificate contract with the provided event details and Merkle root.</p>
-
-                  <div className="alert alert-success mb-3">
-                    <h6>🔗 Soulbound Certificate NFTs - Revolutionary!</h6>
-                    <p className="mb-1">Deploy <strong>Soulbound Certificates</strong> that cost approximately <strong>~100 INR only</strong> and work with <strong>ANY number of addresses</strong>:</p>
-                    <ul className="mb-1">
-                      <li>🔗 <strong>Soulbound Technology</strong> - Certificates permanently bound to recipients</li>
-                      <li>🚫 <strong>Non-transferable</strong> - Cannot be sold, traded, or moved</li>
-                      <li>✅ <strong>Tamper-proof authenticity</strong> - Immutable proof of achievement</li>
-                      <li>✅ Ultra-low deployment cost (~100 INR instead of 1200 INR)</li>
-                      <li>✅ <strong>Universal compatibility</strong> - works with 1, 2, or 1000+ addresses</li>
-                      <li>✅ Academic integrity preserved - no certificate marketplace</li>
-                      <li>✅ Future-proof design following latest Web3 standards</li>
-                    </ul>
-                    <p className="mb-0"><small>🎓 Perfect for academic credentials, professional certifications, and achievement records!</small></p>
-                  </div>
-
-                  {/* Gas Price Info */}
-                  {currentGasPrice && (
-                    <div className="alert alert-info mb-3">
-                      <small>
-                        <strong>Current Network Gas Price:</strong> {currentGasPrice.toFixed(2)} gwei
-                        {currentGasPrice < 2 && <span className="text-success"> • Very Low (Great time to deploy!)</span>}
-                        {currentGasPrice >= 2 && currentGasPrice < 5 && <span className="text-warning"> • Moderate</span>}
-                        {currentGasPrice >= 5 && <span className="text-danger"> • High (Consider waiting)</span>}
-                      </small>
-                    </div>
-                  )}
-
-                  {/* Deployment Mode Selection */}
+                <form onSubmit={handleDeployContract}>
                   <div className="mb-3">
-                    <div className="d-flex justify-content-between align-items-center">
-                      <label className="form-label mb-0">⛽ Deployment Mode</label>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-outline-info"
-                        onClick={checkGasPrices}
-                      >
-                        🔍 Check Gas Prices
-                      </button>
-                    </div>
-                    <div className="row">
-                      <div className="col-md-6">
-                        <div className="form-check">
-                          <input
-                            className="form-check-input"
-                            type="radio"
-                            name="deploymentMode"
-                            id="balancedMode"
-                            value="balanced"
-                            checked={deploymentMode === 'balanced'}
-                            onChange={(e) => setDeploymentMode(e.target.value)}
-                          />
-                          <label className="form-check-label" htmlFor="balancedMode">
-                            <strong>🚀 Balanced (Recommended)</strong><br />
-                            <small className="text-muted">~100-150 INR • 1-3 minutes • Reliable</small>
-                          </label>
-                        </div>
-                      </div>
-                      <div className="col-md-6">
-                        <div className="form-check">
-                          <input
-                            className="form-check-input"
-                            type="radio"
-                            name="deploymentMode"
-                            id="cheapMode"
-                            value="cheap"
-                            checked={deploymentMode === 'cheap'}
-                            onChange={(e) => setDeploymentMode(e.target.value)}
-                          />
-                          <label className="form-check-label" htmlFor="cheapMode">
-                            <strong>🐌 Ultra Cheap</strong><br />
-                            <small className="text-muted">~50-80 INR • 5-15 minutes • May be slow</small>
-                          </label>
-                        </div>
-                      </div>
+                    <label className="form-label">Deployment Mode</label>
+                    <select
+                      className="form-control"
+                      value={deploymentMode}
+                      onChange={(e) => setDeploymentMode(e.target.value)}
+                    >
+                      <option value="balanced">Balanced (Recommended)</option>
+                      <option value="cheap">Ultra Low Cost</option>
+                    </select>
+                    <div className="form-text">
+                      {deploymentMode === 'balanced' 
+                        ? 'Optimized for cost and speed balance.' 
+                        : 'Minimal cost, may take longer to confirm.'}
                     </div>
                   </div>
 
-                  <button
-                    className="btn btn-success"
-                    onClick={handleDeployContract}
-                    disabled={loading || !merkleRoot || !uploadedImageHash}
-                  >
-                    {loading ? 'Deploying...' : `Deploy Soulbound Certificate Contract (${deploymentMode === 'cheap' ? '~50-80 INR' : '~100-150 INR'})`}
-                  </button>
-                </div>
-                
-                <hr className="my-4" />
-                
+                  {currentGasPrice && (
                 <div className="mb-3">
-                  <h5>Update Existing Contract</h5>
-                  <form onSubmit={handleUpdateContract}>
-                    <div className="mb-3">
-                      <label htmlFor="contractAddress" className="form-label">Contract Address</label>
+                      <label className="form-label">Current Gas Price</label>
                       <input
                         type="text"
                         className="form-control"
-                        id="contractAddress"
-                        value={contractAddress}
-                        onChange={(e) => setContractAddress(e.target.value)}
-                        placeholder="0x..."
-                        required
+                        value={`${currentGasPrice.toFixed(2)} Gwei`}
+                        readOnly
                       />
                     </div>
-                    
-                    <button 
-                      type="submit" 
-                      className="btn btn-warning"
-                      disabled={loading}
-                    >
-                      {loading ? 'Updating...' : 'Update Contract'}
-                    </button>
-                  </form>
+                  )}
+                  
+                  <div className="mb-3">
+                    <label className="form-label">Contract Details</label>
+                    <div className="alert alert-info">
+                      <p className="mb-1"><strong>Event Name:</strong> {eventName}</p>
+                      <p className="mb-1"><strong>Symbol:</strong> {eventSymbol}</p>
+                      <p className="mb-1"><strong>Merkle Root:</strong> {merkleRoot}</p>
+                      <p className="mb-1"><strong>Token URI:</strong> ipfs://{metadataHash}</p>
+                      <p className="mb-0"><strong>Participants:</strong> {addresses.split('\n').filter(addr => addr.trim() !== '').length} addresses</p>
+                    </div>
                 </div>
                 
-                <div className="d-flex justify-content-between mt-4">
+                  <div className="d-flex justify-content-between">
                   <button 
                     type="button" 
                     className="btn btn-secondary"
@@ -1327,196 +1156,107 @@ Please proceed to add participant wallet addresses.`);
                   >
                     Back
                   </button>
+                    <button 
+                      type="submit" 
+                      className="btn btn-primary"
+                      disabled={loading}
+                    >
+                      {loading ? 'Deploying...' : 'Deploy Contract'}
+                  </button>
                 </div>
+                </form>
               </div>
             </div>
             
-            {/* Step 5: Deployed Contract Info */}
-            <div className={`card mb-4 ${step !== 5 ? 'd-none' : ''}`}>
+            {/* Step 5: Success */}
+            {step === 5 && (
+              <div className="card">
               <div className="card-header bg-success text-white">
-                <h4 className="mb-0">Step 5: Contract Deployed Successfully!</h4>
+                  <h4 className="mb-0">✅ Deployment Successful!</h4>
               </div>
               <div className="card-body">
-                  <div className="alert alert-success mb-3">
-                    <h5 className="mb-2">🎉 Certificate System Ready!</h5>
-                    <p className="mb-1">✅ <strong>Auto-Downloaded:</strong> certificate-complete-{eventName || 'event'}-[timestamp].json</p>
-                    <p className="mb-0">This file contains everything you need: contract address, Merkle root, proofs, token URI, and instructions.</p>
+                  <div className="alert alert-success">
+                    <h5>🎉 Certificate Contract Deployed!</h5>
+                    <p className="mb-2"><strong>Contract Address:</strong> {deployedContract}</p>
+                    <p className="mb-2"><strong>Network:</strong> {networkName || 'Unknown'}</p>
+                    <p className="mb-0">A comprehensive data file has been downloaded with all the information needed for certificate distribution.</p>
                   </div>
 
-                  <div className="row mb-3">
+                  <div className="row">
                     <div className="col-md-6">
-                      <label className="form-label">Contract Address</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        value={deployedContract}
-                        readOnly
-                      />
+                      <h6>📋 Next Steps:</h6>
+                      <ul>
+                        <li>Share the contract address with participants</li>
+                        <li>Distribute the Merkle proofs file</li>
+                        <li>Participants can claim their certificates</li>
+                        <li>Monitor analytics in the dashboard</li>
+                      </ul>
                     </div>
                     <div className="col-md-6">
-                      <label className="form-label">Merkle Root</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        value={merkleRoot}
-                        readOnly
-                      />
+                      <h6>🔗 Useful Links:</h6>
+                      <ul>
+                        <li><a href={`https://sepolia.etherscan.io/address/${deployedContract}`} target="_blank" rel="noopener noreferrer">View on Etherscan</a></li>
+                        <li><a href="/verify">Verify Certificates</a></li>
+                        <li><a href="/my-certificates">View My Certificates</a></li>
+                      </ul>
                     </div>
                   </div>
 
-                  <div className="mb-3">
-                    <label className="form-label">Token URI</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={metadataHash ? `ipfs://${metadataHash}` : ''}
-                      readOnly
-                    />
-                  </div>
-
-                  <div className="d-flex justify-content-between align-items-center mb-3">
+                  <div className="mt-3 text-center">
                     <button
                       type="button"
-                      className="btn btn-primary"
-                      onClick={() => {
-                        const certificateData = {
-                          eventDetails: {
-                            name: eventName,
-                            symbol: eventSymbol,
-                            description: eventDescription,
-                            date: eventDate
-                          },
-                          blockchain: {
-                            network: "Sepolia Testnet",
-                            contractAddress: deployedContract,
-                            merkleRoot: merkleRoot,
-                            deployedAt: new Date().toISOString()
-                          },
-                          ipfs: {
-                            tokenURI: `ipfs://${metadataHash}`,
-                            imageHash: uploadedImageHash,
-                            metadataHash: metadataHash
-                          },
-                          merkleProofs: merkleProofs,
-                          instructions: {
-                            forOrganizers: [
-                              "1. Share the contract address with participants",
-                              "2. Distribute the Merkle proofs to eligible participants",
-                              "3. Participants can claim certificates using the Student Portal"
-                            ],
-                            forStudents: [
-                              "1. Go to Student Portal",
-                              "2. Enter the contract address",
-                              "3. Find your address in merkleProofs section",
-                              "4. Copy your specific proof array (e.g., [\"0x123...\", \"0x456...\"])",
-                              "5. Paste the proof array in Student Portal",
-                              "6. Verify eligibility and claim certificate"
-                            ]
-                          },
-                          generatedAt: new Date().toISOString()
-                        };
-
-                        const jsonData = JSON.stringify(certificateData, null, 2);
-                        const blob = new Blob([jsonData], { type: 'application/json' });
-                        const url = URL.createObjectURL(blob);
-
-                        const link = document.createElement('a');
-                        link.href = url;
-                        link.download = `certificate-complete-${eventName || 'event'}-${Date.now()}.json`;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-
-                        setTimeout(() => URL.revokeObjectURL(url), 100);
-                      }}
-                    >
-                      📥 Download Complete Certificate Data Again
-                    </button>
-
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary"
+                      className="btn btn-primary me-2"
                       onClick={() => {
                         setStep(1);
-                        // Reset form for new certificate
+                        setActiveTab('analytics');
+                        setAnalyticsContractAddress(deployedContract);
+                      }}
+                    >
+                      View Analytics
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline-primary"
+                      onClick={() => {
+                        setStep(1);
                         setEventName('');
                         setEventSymbol('');
                         setEventDescription('');
                         setEventDate('');
                         setAddresses('');
-                        setMerkleRoot('');
-                        setMerkleProofs({});
                         setCertificateImage(null);
-                        setImagePreview('');
+                        setContractAddress('');
+                        setMerkleRoot('');
+                        setDeployedContract('');
+                        setMerkleProofs(null);
+                        setImagePreview(null);
                         setUploadedImageHash('');
                         setMetadataHash('');
-                        setDeployedContract('');
-                        setError('');
-                        setSuccessMsg('');
                       }}
                     >
-                      🆕 Create New Certificate
+                      Create New Certificate
                     </button>
                   </div>
-
-                  <div className="alert alert-info">
-                    <h5>Next Steps:</h5>
-                    <ol className="mb-2">
-                      <li><strong>Share the contract address</strong> ({deployedContract}) with your participants.</li>
-                      <li><strong>Distribute the complete certificate data file</strong> or individual Merkle proofs to eligible participants.</li>
-                      <li><strong>Guide students</strong> to use the Student Portal with their specific proof.</li>
-                    </ol>
-                    <p className="mb-0"><strong>💡 Tip:</strong> The downloaded file contains detailed instructions for both organizers and students!</p>
                   </div>
               </div>
+            )}
             </div>
+        </motion.div>
+      )}
             
-            {/* Error and success messages */}
+      {/* Error and Success Messages */}
             {error && (
-              <div className="alert alert-danger mt-3">
+        <div className="alert alert-danger mt-3" role="alert">
                 {error}
-
-                {/* Manual contract check for TRANSACTION_REPLACED errors */}
-                {error.includes('TRANSACTION_REPLACED') || error.includes('replaced') && (
-                  <div className="mt-3 p-3 border rounded bg-light">
-                    <h6>🔍 Manual Contract Verification</h6>
-                    <p className="small mb-2">
-                      Your transaction may have succeeded despite the error. Check if your contract was deployed:
-                    </p>
-                    <div className="input-group">
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="Enter contract address to verify"
-                        value={contractAddress}
-                        onChange={(e) => setContractAddress(e.target.value)}
-                      />
-                      <button
-                        className="btn btn-outline-primary"
-                        onClick={() => handleManualContractCheck(contractAddress)}
-                        disabled={checkingContract}
-                      >
-                        {checkingContract ? 'Checking...' : '🔍 Verify Contract'}
-                      </button>
-                    </div>
-                    <small className="text-muted">
-                      Check the transaction hash on <a href="https://sepolia.etherscan.io" target="_blank" rel="noopener noreferrer">Sepolia Etherscan</a> for the contract address.
-                    </small>
-                  </div>
-                )}
               </div>
             )}
 
             {successMsg && (
-              <div className="alert alert-success mt-3">
+        <div className="alert alert-success mt-3" role="alert">
                 {successMsg}
               </div>
             )}
-          </div>
-        </div>
-      )}
-
-    </div>
+    </motion.div>
   );
 };
 

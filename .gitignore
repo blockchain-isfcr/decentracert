@@ -37,3 +37,6 @@ coverage
 
 # Etherscan
 .etherscan-db 
+
+*.md
+!README.md
