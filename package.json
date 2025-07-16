@@ -2,15 +2,15 @@
   "name": "decentracert",
   "version": "1.0.1",
   "description": "Certificate NFT System for University Clubs & Events with Merkle-based claiming",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
-    "start": "concurrently -n \"SERVER,CLIENT\" -c \"green,blue\" \"npm run server\" \"craco start\"",
+    "start": "node server.js",
+    "dev": "concurrently -n \"SERVER,CLIENT\" -c \"green,blue\" \"npm run server\" \"craco start\"",
+    "server": "node server.js",
     "build": "craco build",
     "test": "craco test",
     "eject": "react-scripts eject",
-    "deploy": "npx hardhat run scripts/deploy.js --network sepolia",
-    "server": "node server.js",
-    "dev": "concurrently \"npm run server\" \"craco start\""
+    "deploy": "npx hardhat run scripts/deploy.js --network sepolia"
   },
   "keywords": [
     "blockchain",

@@ -7,7 +7,7 @@ require('dotenv').config();
 const path = require('path');
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors());
@@ -185,7 +185,7 @@ app.get('/api/test', (req, res) => {
 });
 
 // Serve React app for all other routes - this must come LAST
-app.use(express.static('build'));
+app.use(express.static(path.join(__dirname, 'build')));
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'build', 'index.html'));
