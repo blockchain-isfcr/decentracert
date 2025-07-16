@@ -1,20 +1,56 @@
-import axios from 'axios';
-import FormData from 'form-data';
+const multer = require('multer');
+const axios = require('axios');
+const FormData = require('form-data');
+
+// Configure multer for Vercel serverless environment
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
+
+// Helper function to handle multer in serverless environment
+const runMiddleware = (req, res, fn) => {
+  return new Promise((resolve, reject) => {
+    fn(req, res, (result) => {
+      if (result instanceof Error) {
+        return reject(result);
+      }
+      return resolve(result);
+    });
+  });
+};
 
 export default async function handler(req, res) {
+  // Enable CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
   // Only allow POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  console.log('📤 IPFS upload request received');
+  
   try {
-    console.log('📤 IPFS upload request received');
+    // Process the file upload
+    await runMiddleware(req, res, upload.single('file'));
     
-    const { fileData, fileName, fileType, metadata } = req.body;
+    const file = req.file;
+    const metadata = JSON.parse(req.body.metadata || '{}');
 
-    if (!fileData) {
-      console.log('❌ No file data provided');
-      return res.status(400).json({ error: 'No file data provided' });
+    if (!file) {
+      console.log('❌ No file provided');
+      return res.status(400).json({ error: 'No file provided' });
     }
 
     if (!process.env.PINATA_JWT) {
@@ -22,20 +58,17 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Pinata JWT not configured on server' });
     }
 
-    console.log('📁 File received:', fileName, 'Type:', fileType);
-
-    // Convert base64 to buffer
-    const fileBuffer = Buffer.from(fileData, 'base64');
+    console.log('📁 File received:', file.originalname, 'Size:', file.size);
 
     // Create form data for Pinata
     const formData = new FormData();
-    formData.append('file', fileBuffer, {
-      filename: fileName || 'certificate-image',
-      contentType: fileType || 'image/png',
+    formData.append('file', file.buffer, {
+      filename: file.originalname,
+      contentType: file.mimetype,
     });
 
     const pinataMetadata = JSON.stringify({
-      name: metadata?.name || 'certificate-image',
+      name: metadata.name || 'certificate-image',
     });
     formData.append('pinataMetadata', pinataMetadata);
 
@@ -74,11 +107,4 @@ export default async function handler(req, res) {
       res.status(500).json({ error: `Failed to upload to IPFS: ${error.message}` });
     }
   }
-}
-
-// Configure the API route to handle file uploads
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-}; 
+} 

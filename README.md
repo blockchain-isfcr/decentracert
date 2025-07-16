@@ -16,13 +16,13 @@ PORT=3001
 
 ### Required for Frontend
 ```
-REACT_APP_DEPLOYED_CONTRACT_ADDRESS=your_deployed_contract_address
-REACT_APP_SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/your_infura_project_id
+(Optional) - REACT_APP_DEPLOYED_CONTRACT_ADDRESS=your_deployed_contract_address
+SEPOLIA_API_URL=https://sepolia.infura.io/v3/your_infura_project_id
 ```
 
 ### Required for Hardhat (deployment)
 ```
-SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/your_infura_project_id
+SEPOLIA_API_URL=https://sepolia.infura.io/v3/your_infura_project_id
 PRIVATE_KEY=your_deployment_private_key
 ETHERSCAN_API_KEY=your_etherscan_api_key
 ```
@@ -42,17 +42,18 @@ ETHERSCAN_API_KEY=your_etherscan_api_key
 
 3. Create a `.env` file in the root directory with your credentials:
    ```
-   SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/YOUR_INFURA_API_KEY
+   SEPOLIA_API_URL=https://sepolia.infura.io/v3/YOUR_INFURA_API_KEY
    PRIVATE_KEY=YOUR_WALLET_PRIVATE_KEY
    ETHERSCAN_API_KEY=YOUR_ETHERSCAN_API_KEY
    PINATA_API_KEY=YOUR_PINATA_API_KEY
    PINATA_API_SECRET=YOUR_PINATA_API_SECRET
    PINATA_JWT=YOUR_PINATA_JWT
+   PORT=3000
    ```
 
 4. Compile the smart contracts:
    ```
-   npx hardhat compile
+   npm run build
    ```
 
 5. Start the frontend:
@@ -65,7 +66,7 @@ ETHERSCAN_API_KEY=your_etherscan_api_key
 You can deploy the contract either through the Organizer Portal in the web interface or using Hardhat:
 
 ```
-npm run deploy
+npx hardhat run scripts/deploy.js --network sepolia
 ```
 
 ## Workflow
