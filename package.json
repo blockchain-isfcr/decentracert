@@ -53,7 +53,7 @@
     "stream-browserify": "^3.0.0",
     "util": "^0.12.5"
   },
-  "proxy": "http://localhost:3001",
+
   "browserslist": {
     "production": [
       ">0.2%",

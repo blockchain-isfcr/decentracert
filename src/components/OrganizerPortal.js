@@ -116,26 +116,13 @@ The contract is deployed and working. You can proceed with certificate distribut
       throw new Error('Please select a certificate image');
     }
 
-    const formData = new FormData();
-    formData.append('file', certificateImage);
-    
     const metadata = {
       name: `${eventName}-certificate-image`,
     };
-    formData.append('metadata', JSON.stringify(metadata));
 
-    const response = await fetch('/api/upload-ipfs', {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to upload to IPFS');
-    }
-
-    const result = await response.json();
-    return result.ipfsHash;
+    // Use the new utility function for Vercel compatibility
+    const { uploadFileToIPFS } = await import('../utils/ipfsUtils');
+    return await uploadFileToIPFS(certificateImage, metadata);
   };
 
   // Upload metadata to IPFS via backend API
@@ -165,21 +152,9 @@ The contract is deployed and working. You can proceed with certificate distribut
       ]
     };
 
-    const response = await fetch('/api/upload-metadata', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(metadata),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to upload metadata to IPFS');
-    }
-
-    const result = await response.json();
-    return result.ipfsHash;
+    // Use the new utility function for Vercel compatibility
+    const { uploadMetadataToIPFS } = await import('../utils/ipfsUtils');
+    return await uploadMetadataToIPFS(metadata);
   };
 
   // Handle form submission for event details and addresses
@@ -423,21 +398,9 @@ A comprehensive data file has been downloaded with all the information needed fo
 
   // Upload custom metadata to IPFS
   const uploadCustomMetadataToPinata = async (metadata, eventName) => {
-      const response = await fetch('/api/upload-metadata', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(metadata),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to upload metadata to IPFS');
-      }
-
-      const result = await response.json();
-      return result.ipfsHash;
+    // Use the new utility function for Vercel compatibility
+    const { uploadMetadataToIPFS } = await import('../utils/ipfsUtils');
+    return await uploadMetadataToIPFS(metadata);
   };
 
   // Upload AI image to IPFS via backend API
@@ -445,46 +408,13 @@ A comprehensive data file has been downloaded with all the information needed fo
     try {
       console.log('🤖 Starting AI image upload to IPFS...');
       
-      // Convert data URL to blob
-      const response = await fetch(dataUrl);
-      const blob = await response.blob();
-
-      // Create file from blob
-      const file = new File([blob], `${eventName}-ai-certificate.png`, { type: 'image/png' });
-      
-      const formData = new FormData();
-      formData.append('file', file);
-
       const metadata = {
         name: `${eventName}-ai-certificate`,
       };
-      formData.append('metadata', JSON.stringify(metadata));
 
-      console.log('📤 Sending AI image to server...');
-      const uploadResponse = await fetch('/api/upload-ipfs', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!uploadResponse.ok) {
-        const errorText = await uploadResponse.text();
-        console.error('❌ Server response error:', errorText);
-        
-        let errorMessage = 'Failed to upload AI certificate to IPFS';
-        try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.error || errorMessage;
-        } catch (parseError) {
-          console.error('❌ Could not parse error response:', parseError);
-          errorMessage = `Server error: ${uploadResponse.status} ${uploadResponse.statusText}`;
-        }
-        
-        throw new Error(errorMessage);
-      }
-
-      const result = await uploadResponse.json();
-      console.log('✅ AI image uploaded successfully:', result.ipfsHash);
-      return result.ipfsHash;
+      // Use the new utility function for Vercel compatibility
+      const { uploadDataUrlToIPFS } = await import('../utils/ipfsUtils');
+      return await uploadDataUrlToIPFS(dataUrl, `${eventName}-ai-certificate.png`, metadata);
     } catch (error) {
       console.error('❌ Error uploading AI image to IPFS:', error);
       throw new Error(`Failed to upload AI certificate: ${error.message}`);

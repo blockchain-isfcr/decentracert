@@ -780,83 +780,30 @@ export const uploadCertificateToIPFS = async (metadata, imageDataUrl = null) => 
       throw new Error('No image data provided for upload');
     }
 
-    // Convert data URL to blob for upload
-    const response = await fetch(imageDataUrl);
-    const blob = await response.blob();
-    
-    // Create file from blob
-    const file = new File([blob], 'certificate-design.png', { type: 'image/png' });
-    
-    // Create form data for upload
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    const uploadMetadata = {
+    // Import the new utility functions
+    const { uploadDataUrlToIPFS, uploadMetadataToIPFS } = await import('./ipfsUtils');
+
+    // Upload image to IPFS
+    const imageHash = await uploadDataUrlToIPFS(imageDataUrl, 'certificate-design.png', {
       name: metadata.name || 'certificate-design',
+    });
+
+    // Update metadata with image URL
+    const updatedMetadata = {
+      ...metadata,
+      image: `https://gateway.pinata.cloud/ipfs/${imageHash}`,
+      external_url: `https://gateway.pinata.cloud/ipfs/${imageHash}`,
     };
-    formData.append('metadata', JSON.stringify(uploadMetadata));
 
-    console.log('📤 Sending to server API...');
-    
-    // Upload image to IPFS via server
-    const uploadResponse = await fetch('/api/upload-ipfs', {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!uploadResponse.ok) {
-      const errorText = await uploadResponse.text();
-      console.error('❌ Server response error:', errorText);
-      
-      let errorMessage = 'Failed to upload certificate to IPFS';
-      try {
-        const errorData = JSON.parse(errorText);
-        errorMessage = errorData.error || errorMessage;
-      } catch (parseError) {
-        console.error('❌ Could not parse error response:', parseError);
-        errorMessage = `Server error: ${uploadResponse.status} ${uploadResponse.statusText}`;
-      }
-      
-      throw new Error(errorMessage);
-    }
-
-    const uploadResult = await uploadResponse.json();
-    console.log('✅ Image uploaded successfully:', uploadResult.ipfsHash);
-
-    // Now upload metadata to IPFS
-    const metadataResponse = await fetch('/api/upload-metadata', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(metadata),
-    });
-
-    if (!metadataResponse.ok) {
-      const errorText = await metadataResponse.text();
-      console.error('❌ Metadata upload error:', errorText);
-      
-      let errorMessage = 'Failed to upload metadata to IPFS';
-      try {
-        const errorData = JSON.parse(errorText);
-        errorMessage = errorData.error || errorMessage;
-      } catch (parseError) {
-        console.error('❌ Could not parse error response:', parseError);
-        errorMessage = `Server error: ${metadataResponse.status} ${metadataResponse.statusText}`;
-      }
-      
-      throw new Error(errorMessage);
-    }
-
-    const metadataResult = await metadataResponse.json();
-    console.log('✅ Metadata uploaded successfully:', metadataResult.ipfsHash);
+    // Upload metadata to IPFS
+    const metadataHash = await uploadMetadataToIPFS(updatedMetadata);
 
     return {
       success: true,
-      ipfsHash: metadataResult.ipfsHash,
-      ipfsUrl: `ipfs://${metadataResult.ipfsHash}`,
-      gatewayUrl: `https://gateway.pinata.cloud/ipfs/${metadataResult.ipfsHash}`,
-      metadata
+      ipfsHash: metadataHash,
+      ipfsUrl: `ipfs://${metadataHash}`,
+      gatewayUrl: `https://gateway.pinata.cloud/ipfs/${metadataHash}`,
+      metadata: updatedMetadata
     };
 
   } catch (error) {
