@@ -110,7 +110,7 @@ const AnalyticsDashboard = ({ contractAddress, provider }) => {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h3 className="mb-1">📊 Analytics Dashboard</h3>
-          <p className="text-muted mb-0">{stats.contractName} ({stats.contractSymbol})</p>
+          <p style={{ color: '#ffffff' }} className="mb-0">{stats.contractName} ({stats.contractSymbol})</p>
         </div>
         <div className="btn-group">
           <button 
@@ -201,14 +201,14 @@ const AnalyticsDashboard = ({ contractAddress, provider }) => {
         <div className="col-md-6">
           <div className="card">
             <div className="card-header">
-              <h5>📈 Claims Timeline</h5>
+              <h5 style={{ color: '#ffffff' }} >📈 Claims Timeline</h5>
             </div>
             <div className="card-body">
               {claimsByDate.length > 0 ? (
                 <div className="timeline-chart">
                   {claimsByDate.map((day, index) => (
                     <div key={index} className="d-flex justify-content-between align-items-center mb-2">
-                      <span className="small">{new Date(day.date).toLocaleDateString()}</span>
+                      <span style={{ color: '#ffffff' }} className="small">{new Date(day.date).toLocaleDateString()}</span>
                       <div className="progress flex-grow-1 mx-2" style={{height: '20px'}}>
                         <div 
                           className="progress-bar bg-primary" 
@@ -222,7 +222,7 @@ const AnalyticsDashboard = ({ contractAddress, provider }) => {
                   ))}
                 </div>
               ) : (
-                <p className="text-muted">No claims data available</p>
+                <p style={{ color: '#ffffff' }}>No claims data available</p>
               )}
             </div>
           </div>
@@ -232,24 +232,24 @@ const AnalyticsDashboard = ({ contractAddress, provider }) => {
         <div className="col-md-6">
           <div className="card">
             <div className="card-header">
-              <h5>⛽ Gas Usage Analysis</h5>
+              <h5 style={{ color: '#ffffff' }} >⛽ Gas Usage Analysis</h5>
             </div>
             <div className="card-body">
               <div className="row">
                 <div className="col-6">
-                  <strong>Min Gas:</strong><br />
+                  <strong style={{ color: '#ffffff' }} >Min Gas:</strong><br />
                   <span className="text-success">{parseInt(gasMetrics.minGas).toLocaleString()}</span>
                 </div>
                 <div className="col-6">
-                  <strong>Max Gas:</strong><br />
+                  <strong style={{ color: '#ffffff' }} >Max Gas:</strong><br />
                   <span className="text-danger">{parseInt(gasMetrics.maxGas).toLocaleString()}</span>
                 </div>
                 <div className="col-6 mt-2">
-                  <strong>Average:</strong><br />
+                  <strong style={{ color: '#ffffff' }} >Average:</strong><br />
                   <span className="text-primary">{parseInt(gasMetrics.avgGas).toLocaleString()}</span>
                 </div>
                 <div className="col-6 mt-2">
-                  <strong>Total Cost:</strong><br />
+                  <strong style={{ color: '#ffffff' }} >Total Cost:</strong><br />
                   <span className="text-warning">{parseFloat(gasMetrics.totalGasCost).toFixed(4)} ETH</span>
                 </div>
               </div>
@@ -268,7 +268,7 @@ const AnalyticsDashboard = ({ contractAddress, provider }) => {
       {/* Claimants Table */}
       <div className="card">
         <div className="card-header">
-          <h5>👥 Certificate Claimants ({claimants.length})</h5>
+          <h5 style={{ color: '#ffffff' }} >👥 Certificate Claimants ({claimants.length})</h5>
         </div>
         <div className="card-body">
           {claimants.length > 0 ? (
@@ -307,13 +307,13 @@ const AnalyticsDashboard = ({ contractAddress, provider }) => {
                 </tbody>
               </table>
               {claimants.length > 10 && (
-                <p className="text-muted text-center">
+                <p style={{ color: '#ffffff' }} className="text-center">
                   Showing first 10 claimants. Export CSV for complete data.
                 </p>
               )}
             </div>
           ) : (
-            <p className="text-muted">No claimants yet.</p>
+            <p style={{ color: '#ffffff' }}>No claimants yet.</p>
           )}
         </div>
       </div>

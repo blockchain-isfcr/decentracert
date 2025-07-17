@@ -153,11 +153,11 @@ const AICertificateGenerator = ({ onCertificateGenerated }) => {
                   style={{width: `${(step / 4) * 100}%`}}
                 ></div>
               </div>
-              <div className="d-flex justify-content-between small text-muted">
-                <span className={step >= 1 ? 'text-primary fw-bold' : ''}>1. Event Details</span>
-                <span className={step >= 2 ? 'text-primary fw-bold' : ''}>2. Design Options</span>
-                <span className={step >= 3 ? 'text-primary fw-bold' : ''}>3. Preview</span>
-                <span className={step >= 4 ? 'text-primary fw-bold' : ''}>4. Complete</span>
+              <div className="d-flex justify-content-between small" style={{ color: '#ffffff' }}>
+                <span className={step >= 1 ? 'text-primary fw-bold' : ''} style={{ color: step >= 1 ? '#8b5cf6' : '#ffffff' }}>1. Event Details</span>
+                <span className={step >= 2 ? 'text-primary fw-bold' : ''} style={{ color: step >= 2 ? '#8b5cf6' : '#ffffff' }}>2. Design Options</span>
+                <span className={step >= 3 ? 'text-primary fw-bold' : ''} style={{ color: step >= 3 ? '#8b5cf6' : '#ffffff' }}>3. Preview</span>
+                <span className={step >= 4 ? 'text-primary fw-bold' : ''} style={{ color: step >= 4 ? '#8b5cf6' : '#ffffff' }}>4. Complete</span>
               </div>
             </div>
           </div>
@@ -165,11 +165,11 @@ const AICertificateGenerator = ({ onCertificateGenerated }) => {
           {/* Step 1: Event Details Input */}
           {step === 1 && (
             <div>
-              <h5>📝 Event Information</h5>
+              <h5 style={{ color: '#efe8ff' }}>📝 Event Information</h5>
               <div className="row">
                 <div className="col-md-6">
                   <div className="mb-3">
-                    <label className="form-label">Event Name *</label>
+                    <label className="form-label">Event Name</label>
                     <input
                       type="text"
                       className="form-control"
@@ -262,9 +262,9 @@ const AICertificateGenerator = ({ onCertificateGenerated }) => {
                                   readOnly
                                 />
                                 <div>
-                                  <strong>{style.label}</strong>
+                                  <strong style={{ color: '#ffffff' }}>{style.label}</strong>
                                   <br />
-                                  <small className="text-muted">{style.description}</small>
+                                  <small style={{ color: '#ffffff' }}>{style.description}</small>
                                 </div>
                               </div>
                             </div>
@@ -302,8 +302,8 @@ const AICertificateGenerator = ({ onCertificateGenerated }) => {
           {/* Step 2: Design Selection */}
           {step === 2 && (
             <div>
-              <h5>🎨 Choose Your Design</h5>
-              <p className="text-muted">Select the design that best fits your event:</p>
+              <h5 style={{ color: '#ffffff' }}>🎨 Choose Your Design</h5>
+              <p style={{ color: '#ffffff' }}>Select the design that best fits your event:</p>
               
               <div className="row">
                 {generatedDesigns.map((design, index) => (
@@ -345,7 +345,7 @@ const AICertificateGenerator = ({ onCertificateGenerated }) => {
           {/* Step 3: Preview */}
           {step === 3 && selectedDesign && (
             <div>
-              <h5>👀 Preview Selected Design</h5>
+              <h5 style={{ color: '#ffffff' }}>👀 Preview Selected Design</h5>
               
               <div className="row">
                 <div className="col-md-6">
@@ -356,21 +356,21 @@ const AICertificateGenerator = ({ onCertificateGenerated }) => {
                   />
                 </div>
                 <div className="col-md-6">
-                  <h6>Design Details:</h6>
+                  <h6 style={{ color: '#ffffff' }}>Design Details:</h6>
                   <ul className="list-unstyled">
-                    <li><strong>Style:</strong> {designStyles.find(s => s.value === selectedDesign.style)?.label}</li>
-                    <li><strong>Event:</strong> {eventData.name}</li>
-                    <li><strong>Category:</strong> {eventData.category}</li>
-                    <li><strong>AI Service:</strong> {selectedDesign.service}</li>
+                    <li style={{ color: '#ffffff' }}><strong>Style:</strong> <span style={{ color: '#ffffff' }}>{designStyles.find(s => s.value === selectedDesign.style)?.label}</span></li>
+                    <li style={{ color: '#ffffff' }}><strong>Event:</strong> <span style={{ color: '#ffffff' }}>{eventData.name}</span></li>
+                    <li style={{ color: '#ffffff' }}><strong>Category:</strong> <span style={{ color: '#ffffff' }}>{eventData.category}</span></li>
+                    <li style={{ color: '#ffffff' }}><strong>AI Service:</strong> <span style={{ color: '#ffffff' }}>{selectedDesign.service}</span></li>
                   </ul>
                   
                   <div className="alert alert-info">
-                    <h6>🎯 What happens next:</h6>
-                    <ul className="mb-0">
+                    <h6 style={{ color: '#ffffff' }}>🎯 What happens next:</h6>
+                    <ul className="mb-0" style={{ color: '#ffffff' }}>
                       <li>✅ Generate final certificate metadata</li>
                       <li>✅ Upload design and data to IPFS</li>
                       <li>✅ Auto-fill certificate creation form</li>
-                      <li>✅ Skip to participant addresses step</li>
+                      <li>✅ Go to participant addresses step</li>
                       <li>🚀 Ready for smart contract deployment!</li>
                     </ul>
                   </div>
@@ -414,10 +414,11 @@ const AICertificateGenerator = ({ onCertificateGenerated }) => {
                   <div className="col-md-6">
                     <strong>🚀 Next Steps:</strong>
                     <ul className="mb-0">
-                      <li>Form will be auto-filled</li>
-                      <li>Add participant addresses</li>
-                      <li>Deploy smart contract</li>
-                      <li>Start issuing certificates!</li>
+                      <li>✅ Form will be auto-filled</li>
+                      <li>📝 Add participant addresses (required)</li>
+                      <li>🔗 Generate Merkle proofs</li>
+                      <li>🚀 Deploy smart contract</li>
+                      <li>🎉 Start issuing certificates!</li>
                     </ul>
                   </div>
                 </div>
@@ -432,15 +433,28 @@ const AICertificateGenerator = ({ onCertificateGenerated }) => {
                   />
                 </div>
                 <div className="col-md-6">
-                  <h6>📋 Certificate Details:</h6>
+                  <h6 style={{ color: '#ffffff' }}>📋 Certificate Details:</h6>
                   <div className="card">
                     <div className="card-body">
-                      <p><strong>Token URI:</strong></p>
-                      <code className="small d-block bg-light p-2 rounded">
-                        {finalCertificate.tokenURI}
+                      <p style={{ color: '#ffffff' }}><strong>Token URI:</strong></p>
+                      <code className="small d-block bg-light p-2 rounded" style={{ color: '#000000' }}>
+                        {finalCertificate.tokenURI.startsWith('ipfs://') 
+                          ? `ipfs://${finalCertificate.tokenURI.split('/').pop()}`
+                          : finalCertificate.tokenURI
+                        }
                       </code>
                       
-                      <p className="mt-3"><strong>IPFS Gateway:</strong></p>
+                      <p className="mt-3" style={{ color: '#ffffff' }}><strong>Certificate Preview:</strong></p>
+                      <div className="certificate-preview mb-3">
+                        <img 
+                          src={finalCertificate.design.imageUrl} 
+                          alt="Certificate Preview" 
+                          className="img-fluid rounded border"
+                          style={{ maxHeight: '200px', maxWidth: '100%' }}
+                        />
+                      </div>
+                      
+                      <p className="mt-3" style={{ color: '#ffffff' }}><strong>IPFS Gateway:</strong></p>
                       <a 
                         href={finalCertificate.ipfs.gatewayUrl} 
                         target="_blank" 
@@ -450,8 +464,8 @@ const AICertificateGenerator = ({ onCertificateGenerated }) => {
                         View on IPFS
                       </a>
                       
-                      <p className="mt-3"><strong>Design Style:</strong> {selectedDesign.style}</p>
-                      <p><strong>AI Service:</strong> {finalCertificate.design.service}</p>
+                      <p className="mt-3" style={{ color: '#ffffff' }}><strong>Design Style:</strong> <span style={{ color: '#ffffff' }}>{selectedDesign.style}</span></p>
+                      <p style={{ color: '#ffffff' }}><strong>AI Service:</strong> <span style={{ color: '#ffffff' }}>{finalCertificate.design.service}</span></p>
                     </div>
                   </div>
                   

@@ -321,6 +321,48 @@ const CertificateVerifier = () => {
                         }
                       </p>
                     </div>
+                    
+                    {verificationResult.walletInfo.hasCertificate && verificationResult.metadata && (
+                      <div className="mt-3">
+                        <h6 style={{ color: '#ffffff', fontWeight: 'bold' }}>Certificate Details:</h6>
+                        <div className="row">
+                          <div className="col-md-6">
+                            <p style={{ color: '#ffffff' }}><strong>Name:</strong> {verificationResult.metadata.name || 'Not specified'}</p>
+                            <p style={{ color: '#ffffff' }}><strong>Description:</strong> {verificationResult.metadata.description || 'Not specified'}</p>
+                            {verificationResult.metadata.attributes && verificationResult.metadata.attributes.length > 0 && (
+                              <div>
+                                <strong style={{ color: '#ffffff' }}>Attributes:</strong>
+                                <ul className="mb-0" style={{ color: '#ffffff' }}>
+                                  {verificationResult.metadata.attributes.map((attr, index) => (
+                                    <li key={index} style={{ color: '#ffffff' }}>{attr.trait_type}: {attr.value}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                          <div className="col-md-6">
+                            {verificationResult.metadata.image && (
+                              <div>
+                                <p style={{ color: '#ffffff' }}><strong>Certificate Preview:</strong></p>
+                                <img 
+                                  src={verificationResult.metadata.image} 
+                                  alt="Certificate Preview" 
+                                  className="img-fluid rounded border"
+                                  style={{ maxHeight: '200px', maxWidth: '100%' }}
+                                  onError={(e) => {
+                                    e.target.style.display = 'none';
+                                    e.target.nextSibling.style.display = 'block';
+                                  }}
+                                />
+                                <div style={{ display: 'none' }} className="text-muted">
+                                  <small style={{ color: '#ffffff' }}>Image preview not available. <a href={verificationResult.metadata.image} target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa' }}>View original</a></small>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>

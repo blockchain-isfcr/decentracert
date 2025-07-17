@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { generateAllMerkleProofs } from '../utils/merkleUtils';
 import { deployCertificateContractOptimized, deployCertificateContractUltraLow, updateMerkleRoot, updateEventDetails } from '../utils/contractUtils';
@@ -30,10 +30,23 @@ const OrganizerPortal = ({ account, provider, signer, connectWallet }) => {
         const gasPrice = await provider.getGasPrice();
         const gasPriceGwei = parseFloat(ethers.utils.formatUnits(gasPrice, 'gwei'));
         setCurrentGasPrice(gasPriceGwei);
+        console.log('Current gas price:', gasPriceGwei, 'Gwei');
         return gasPriceGwei;
       }
     } catch (error) {
       console.error('Error checking gas prices:', error);
+      // Try alternative method
+      try {
+        const response = await fetch('https://api.etherscan.io/api?module=gastracker&action=gasoracle&apikey=YourApiKeyToken');
+        const data = await response.json();
+        if (data.result && data.result.SafeGasPrice) {
+          const gasPriceGwei = parseFloat(data.result.SafeGasPrice);
+          setCurrentGasPrice(gasPriceGwei);
+          return gasPriceGwei;
+        }
+      } catch (fallbackError) {
+        console.error('Fallback gas price check failed:', fallbackError);
+      }
     }
     return null;
   };
@@ -91,9 +104,44 @@ The contract is deployed and working. You can proceed with certificate distribut
   const [uploadedImageHash, setUploadedImageHash] = useState('');
   const [metadataHash, setMetadataHash] = useState('');
 
+  // Notification management
+  const showNotification = (message, type = 'success', duration = 8000) => {
+    if (type === 'success') {
+      setSuccessMsg(message);
+      setError('');
+    } else {
+      setError(message);
+      setSuccessMsg('');
+    }
+
+    // Auto-scroll to notification
+    setTimeout(() => {
+      const notificationElement = document.querySelector('.alert');
+      if (notificationElement) {
+        notificationElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+
+    // Auto-hide notification
+    setTimeout(() => {
+      if (type === 'success') {
+        setSuccessMsg('');
+      } else {
+        setError('');
+      }
+    }, duration);
+  };
+
   // New features state
   const [activeTab, setActiveTab] = useState('create'); // 'create', 'analytics', 'ai-generator'
   const [analyticsContractAddress, setAnalyticsContractAddress] = useState('');
+
+  // Check gas prices when step 5 is loaded
+  useEffect(() => {
+    if (step === 5 && provider) {
+      checkGasPrices();
+    }
+  }, [step, provider]);
 
   // Handle image file selection
   const handleImageChange = (e) => {
@@ -227,18 +275,18 @@ The contract is deployed and working. You can proceed with certificate distribut
         setTimeout(() => URL.revokeObjectURL(url), 100);
       }, 500); // Small delay to ensure state is updated
 
-      setSuccessMsg('Merkle root and proofs generated and downloaded successfully!');
+      showNotification('Merkle root and proofs generated and downloaded successfully!');
 
-      // If AI certificate is already generated (has uploadedImageHash), skip to step 4 (deploy)
+      // If AI certificate is already generated (has uploadedImageHash), skip to step 5 (deploy)
       if (uploadedImageHash && metadataHash) {
-        setStep(4);
-        setSuccessMsg(prevMsg => prevMsg + '\n\n🚀 Ready to deploy contract! All steps completed.');
+        setStep(5);
+        showNotification('🚀 Ready to deploy contract! All steps completed.');
       } else {
-        setStep(2); // Go to image upload step
+        setStep(4); // Go to image upload step
       }
     } catch (error) {
       console.error('Error generating Merkle root:', error);
-      setError('Failed to generate Merkle root: ' + error.message);
+      showNotification('Failed to generate Merkle root: ' + error.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -299,11 +347,11 @@ The contract is deployed and working. You can proceed with certificate distribut
       setSuccessMsg('Certificate image and metadata uploaded to IPFS successfully!');
 
       // Auto-proceed to deploy step
-      setStep(4);
-      setSuccessMsg(prevMsg => prevMsg + '\n\n🚀 Ready to deploy contract!');
+      setStep(5);
+      showNotification('🚀 Ready to deploy contract!');
     } catch (error) {
       console.error('Error uploading to IPFS:', error);
-      setError('Failed to upload to IPFS: ' + error.message);
+      showNotification('Failed to upload to IPFS: ' + error.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -405,17 +453,15 @@ The contract is deployed and working. You can proceed with certificate distribut
             setTimeout(() => URL.revokeObjectURL(url), 100);
       }, 500);
 
-      setSuccessMsg(`✅ Contract deployed successfully!
+      showNotification(`✅ Contract deployed successfully!
 
 Contract Address: ${contractAddress}
 Network: ${networkName || 'Unknown'}
 
 A comprehensive data file has been downloaded with all the information needed for certificate distribution.`);
-
-      setStep(5);
     } catch (error) {
       console.error('Error deploying contract:', error);
-      setError('Failed to deploy contract: ' + error.message);
+      showNotification('Failed to deploy contract: ' + error.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -522,12 +568,12 @@ A comprehensive data file has been downloaded with all the information needed fo
         date: eventData.date
       });
 
-      setSuccessMsg('🎉 AI Certificate generated and uploaded successfully! Ready to add participant addresses.');
+      showNotification('🎉 AI Certificate generated and uploaded successfully! Now add participant addresses to continue.');
       setActiveTab('create');
-      setStep(2); // Skip to participant addresses step
+      setStep(2); // Go to participant addresses step
     } catch (error) {
       console.error('Error handling AI certificate:', error);
-      setError('Failed to process AI certificate: ' + error.message);
+      showNotification('Failed to process AI certificate: ' + error.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -676,12 +722,12 @@ A comprehensive data file has been downloaded with all the information needed fo
                 <div
                   className="progress-bar premium-progress-bar"
                   role="progressbar"
-                  style={{width: `${step * 25}%`}}
-                  aria-valuenow={step * 25}
+                  style={{width: `${step * 20}%`}}
+                  aria-valuenow={step * 20}
                   aria-valuemin="0"
                   aria-valuemax="100"
                 >
-                  Step {step} of 4
+                  Step {step} of 5
                 </div>
               </div>
 
@@ -689,11 +735,12 @@ A comprehensive data file has been downloaded with all the information needed fo
                 <small className={uploadedImageHash ? 'text-success fw-bold' : ''}>
                   {uploadedImageHash ? '✅ Event Details (AI)' : 'Event Details'}
                 </small>
-                <small className={step >= 2 ? 'text-primary fw-bold' : ''}>Generate Proofs</small>
-                <small className={uploadedImageHash ? 'text-success fw-bold' : step >= 3 ? 'text-primary fw-bold' : ''}>
+                <small className={step >= 2 ? 'text-primary fw-bold' : ''}>Participants</small>
+                <small className={step >= 3 ? 'text-primary fw-bold' : ''}>Generate Proofs</small>
+                <small className={uploadedImageHash ? 'text-success fw-bold' : step >= 4 ? 'text-primary fw-bold' : ''}>
                   {uploadedImageHash ? '✅ AI Assets' : 'Upload Assets'}
                 </small>
-                <small className={step >= 4 ? 'text-primary fw-bold' : ''}>Deploy Contract</small>
+                <small className={step >= 5 ? 'text-primary fw-bold' : ''}>Deploy Contract</small>
               </div>
 
               {uploadedImageHash && activeTab === 'ai-generator' && (
@@ -772,7 +819,7 @@ A comprehensive data file has been downloaded with all the information needed fo
           <div className="col-lg-10 mx-auto">
             <div className="card mb-3">
             <div className="card-header">
-                <h5 className="mb-0">📊 Certificate Analytics</h5>
+                <h5 style={{ color: '#ffffff' }} className="mb-0">📊 Certificate Analytics</h5>
             </div>
             <div className="card-body">
               <div className="mb-3">
@@ -786,8 +833,8 @@ A comprehensive data file has been downloaded with all the information needed fo
                 />
               </div>
               {analyticsContractAddress && (
-                <small className="text-muted">
-                  Analyzing contract: <code>{analyticsContractAddress}</code>
+                <small style={{ color: '#ffffff' }}>
+                  Analyzing contract: <code style={{ color: '#ffffff' }}>{analyticsContractAddress}</code>
                 </small>
               )}
             </div>
@@ -826,7 +873,7 @@ A comprehensive data file has been downloaded with all the information needed fo
             {/* Step 1: Event Details */}
             <div className={`card ${step !== 1 ? 'd-none' : ''}`}>
               <div className="card-header bg-primary text-white">
-                <h4 className="mb-0">Step 1: Event Details & Participant Addresses</h4>
+                <h4 className="mb-0">Step 1: Event Details</h4>
                 {uploadedImageHash && (
                   <small className="d-block mt-1">
                     🤖 AI Certificate Generated - Details Pre-filled
@@ -844,7 +891,7 @@ A comprehensive data file has been downloaded with all the information needed fo
                             <div className="mb-2">
                               <i className="fas fa-image text-primary" style={{fontSize: '2rem'}}></i>
                             </div>
-                            <small className="text-muted">AI Generated Certificate</small>
+                            <small style={{ color: '#ffffff' }}>AI Generated Certificate</small>
                             <br />
                             <small className="text-success">✅ Design Ready</small>
                           </div>
@@ -864,7 +911,7 @@ A comprehensive data file has been downloaded with all the information needed fo
                           ✅ Event details auto-filled below<br/>
                           ✅ Ready for participant addresses
                         </p>
-                        <small className="text-muted">
+                        <small style={{ color: '#ffffff' }}>
                           You can modify the details below if needed, then add participant addresses to continue.
                         </small>
                       </div>
@@ -927,6 +974,27 @@ A comprehensive data file has been downloaded with all the information needed fo
                     />
                   </div>
                   
+                  <div className="text-center">
+                  <button 
+                    type="button" 
+                    className="btn btn-primary"
+                    onClick={() => setStep(2)}
+                    disabled={!eventName || !eventSymbol || !eventDescription || !eventDate}
+                  >
+                    Next: Add Participants
+                  </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+            
+            {/* Step 2: Participant Addresses */}
+            <div className={`card ${step !== 2 ? 'd-none' : ''}`}>
+              <div className="card-header bg-primary text-white">
+                <h4 className="mb-0">Step 2: Participant Addresses</h4>
+              </div>
+              <div className="card-body">
+                <form onSubmit={handleCreateMerkleRoot}>
                   <div className="mb-3">
                     <label htmlFor="addresses" className="form-label">Participant Wallet Addresses</label>
                     <textarea
@@ -941,23 +1009,30 @@ A comprehensive data file has been downloaded with all the information needed fo
                     <div className="form-text">Enter one Ethereum wallet address per line. These addresses will be eligible to claim the certificate.</div>
                   </div>
                   
-                  <div className="text-center">
-                  <button 
-                    type="submit" 
-                    className="btn btn-primary"
-                    disabled={loading}
-                  >
-                    {loading ? 'Processing...' : 'Generate Merkle Proofs'}
-                  </button>
+                  <div className="d-flex justify-content-between">
+                    <button 
+                      type="button" 
+                      className="btn btn-secondary"
+                      onClick={() => setStep(1)}
+                    >
+                      Back
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="btn btn-primary"
+                      disabled={loading || !addresses.trim()}
+                    >
+                      {loading ? 'Processing...' : 'Generate Merkle Proofs'}
+                    </button>
                   </div>
                 </form>
               </div>
             </div>
             
-            {/* Step 2: Merkle Proofs */}
-            <div className={`card ${step !== 2 ? 'd-none' : ''}`}>
+            {/* Step 3: Merkle Proofs */}
+            <div className={`card ${step !== 3 ? 'd-none' : ''}`}>
               <div className="card-header bg-primary text-white">
-                <h4 className="mb-0">Step 2: Merkle Root & Proofs</h4>
+                <h4 className="mb-0">Step 3: Merkle Root & Proofs</h4>
               </div>
               <div className="card-body">
                 <div className="mb-3">
@@ -986,14 +1061,14 @@ A comprehensive data file has been downloaded with all the information needed fo
                   <button 
                     type="button" 
                     className="btn btn-secondary"
-                    onClick={() => setStep(1)}
+                    onClick={() => setStep(2)}
                   >
                     Back
                   </button>
                   <button
                     type="button"
                     className="btn btn-primary"
-                    onClick={() => uploadedImageHash && metadataHash ? setStep(4) : setStep(3)}
+                    onClick={() => uploadedImageHash && metadataHash ? setStep(5) : setStep(4)}
                   >
                     {uploadedImageHash && metadataHash ? 'Next: Deploy Contract' : 'Next: Upload Certificate Image'}
                   </button>
@@ -1001,10 +1076,10 @@ A comprehensive data file has been downloaded with all the information needed fo
               </div>
             </div>
             
-            {/* Step 3: Upload Certificate Image */}
-            <div className={`card ${step !== 3 ? 'd-none' : ''}`}>
+            {/* Step 4: Upload Certificate Image */}
+            <div className={`card ${step !== 4 ? 'd-none' : ''}`}>
               <div className="card-header bg-primary text-white">
-                <h4 className="mb-0">Step 3: Upload Certificate Image</h4>
+                <h4 className="mb-0">Step 4: Upload Certificate Image</h4>
               </div>
               <div className="card-body">
                 <form onSubmit={handleUploadToIPFS}>
@@ -1023,27 +1098,28 @@ A comprehensive data file has been downloaded with all the information needed fo
                   
                   {imagePreview && (
                     <div className="mb-3">
-                      <label className="form-label">Preview</label>
+                      <label className="form-label">Certificate Preview</label>
                       <div className="border p-2 text-center">
-                        {imagePreview.startsWith('data:image') ? (
-                          <div className="p-4 bg-light rounded">
-                            <div className="mb-2">
-                              <i className="fas fa-image text-primary" style={{fontSize: '3rem'}}></i>
-                            </div>
-                            <div className="text-muted">
-                              <strong>AI Generated Certificate</strong>
-                              <br />
-                              <small>Design ready for deployment</small>
-                            </div>
+                        <img 
+                          src={imagePreview} 
+                          alt="Certificate Preview" 
+                          className="img-fluid rounded border" 
+                          style={{ maxHeight: '300px', maxWidth: '100%' }} 
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'block';
+                          }}
+                        />
+                        <div style={{ display: 'none' }} className="p-4 bg-light rounded">
+                          <div className="mb-2">
+                            <i className="fas fa-image text-primary" style={{fontSize: '3rem'}}></i>
                           </div>
-                        ) : (
-                          <img 
-                            src={imagePreview} 
-                            alt="Certificate Preview" 
-                            className="img-fluid" 
-                            style={{ maxHeight: '300px' }} 
-                          />
-                        )}
+                          <div style={{ color: '#ffffff' }}>
+                            <strong>Image Preview Not Available</strong>
+                            <br />
+                            <small style={{ color: '#ffffff' }}>Please check the uploaded file</small>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1052,7 +1128,7 @@ A comprehensive data file has been downloaded with all the information needed fo
                     <button 
                       type="button" 
                       className="btn btn-secondary"
-                      onClick={() => setStep(2)}
+                      onClick={() => setStep(3)}
                     >
                       Back
                     </button>
@@ -1115,7 +1191,7 @@ A comprehensive data file has been downloaded with all the information needed fo
                       <button
                         type="button"
                         className="btn btn-success"
-                        onClick={() => setStep(4)}
+                        onClick={() => setStep(5)}
                       >
                         Next: Deploy Contract
                       </button>
@@ -1125,10 +1201,10 @@ A comprehensive data file has been downloaded with all the information needed fo
               </div>
             </div>
             
-            {/* Step 4: Deploy Contract */}
-            <div className={`card ${step !== 4 ? 'd-none' : ''}`}>
+            {/* Step 5: Deploy Contract */}
+            <div className={`card ${step !== 5 ? 'd-none' : ''}`}>
               <div className="card-header bg-primary text-white">
-                <h4 className="mb-0">Step 4: Deploy Smart Contract</h4>
+                <h4 className="mb-0">Step 5: Deploy Smart Contract</h4>
               </div>
               <div className="card-body">
                 <form onSubmit={handleDeployContract}>
@@ -1138,9 +1214,14 @@ A comprehensive data file has been downloaded with all the information needed fo
                       className="form-control"
                       value={deploymentMode}
                       onChange={(e) => setDeploymentMode(e.target.value)}
+                      style={{
+                        backgroundColor: '#2d3748',
+                        color: '#ffffff',
+                        border: '1px solid #4a5568'
+                      }}
                     >
-                      <option value="balanced">Balanced (Recommended)</option>
-                      <option value="cheap">Ultra Low Cost</option>
+                      <option value="balanced" style={{ backgroundColor: '#2d3748', color: '#ffffff' }}>Balanced (Recommended)</option>
+                      <option value="cheap" style={{ backgroundColor: '#2d3748', color: '#ffffff' }}>Ultra Low Cost</option>
                     </select>
                     <div className="form-text">
                       {deploymentMode === 'balanced' 
@@ -1176,7 +1257,7 @@ A comprehensive data file has been downloaded with all the information needed fo
                   <button 
                     type="button" 
                     className="btn btn-secondary"
-                    onClick={() => setStep(3)}
+                    onClick={() => setStep(4)}
                   >
                     Back
                   </button>
@@ -1192,8 +1273,8 @@ A comprehensive data file has been downloaded with all the information needed fo
               </div>
             </div>
             
-            {/* Step 5: Success */}
-            {step === 5 && (
+            {/* Success Step */}
+            {deployedContract && (
               <div className="card">
               <div className="card-header bg-success text-white">
                   <h4 className="mb-0">✅ Deployment Successful!</h4>
@@ -1208,8 +1289,8 @@ A comprehensive data file has been downloaded with all the information needed fo
 
                   <div className="row">
                     <div className="col-md-6">
-                      <h6>📋 Next Steps:</h6>
-                      <ul>
+                      <h6 style={{ color: '#ffffff' }}>📋 Next Steps:</h6>
+                      <ul style={{ color: '#ffffff' }}>
                         <li>Share the contract address with participants</li>
                         <li>Distribute the Merkle proofs file</li>
                         <li>Participants can claim their certificates</li>
@@ -1217,11 +1298,11 @@ A comprehensive data file has been downloaded with all the information needed fo
                       </ul>
                     </div>
                     <div className="col-md-6">
-                      <h6>🔗 Useful Links:</h6>
-                      <ul>
-                        <li><a href={`https://sepolia.etherscan.io/address/${deployedContract}`} target="_blank" rel="noopener noreferrer">View on Etherscan</a></li>
-                        <li><a href="/verify">Verify Certificates</a></li>
-                        <li><a href="/my-certificates">View My Certificates</a></li>
+                      <h6 style={{ color: '#ffffff' }}>🔗 Useful Links:</h6>
+                      <ul style={{ color: '#ffffff' }}>
+                        <li><a href={`https://sepolia.etherscan.io/address/${deployedContract}`} target="_blank" rel="noopener noreferrer" style={{ color: '#ffffff' }}>View on Etherscan</a></li>
+                        <li><a href="/verify" style={{ color: '#ffffff' }}>Verify Certificates</a></li>
+                        <li><a href="/my-certificates" style={{ color: '#ffffff' }}>View My Certificates</a></li>
                       </ul>
                     </div>
                   </div>
@@ -1237,6 +1318,47 @@ A comprehensive data file has been downloaded with all the information needed fo
                       }}
                     >
                       View Analytics
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-info me-2"
+                      onClick={() => {
+                        // Download comprehensive details again
+                        const comprehensiveData = {
+                          contractAddress: deployedContract,
+                          network: networkName || 'Sepolia',
+                          deployedAt: new Date().toISOString(),
+                          eventDetails: {
+                            name: eventName,
+                            symbol: eventSymbol,
+                            description: eventDescription,
+                            date: eventDate
+                          },
+                          tokenURI: `ipfs://${metadataHash}`,
+                          imageHash: uploadedImageHash,
+                          metadataHash: metadataHash,
+                          merkleRoot: merkleRoot,
+                          merkleProofs: merkleProofs,
+                          participants: addresses.split('\n').filter(addr => addr.trim() !== ''),
+                          deploymentMode: deploymentMode,
+                          gasPrice: currentGasPrice
+                        };
+
+                        const jsonData = JSON.stringify(comprehensiveData, null, 2);
+                        const blob = new Blob([jsonData], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = `certificate-deployment-${eventName || 'event'}-${Date.now()}.json`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+
+                        setTimeout(() => URL.revokeObjectURL(url), 100);
+                      }}
+                    >
+                      📥 Download Details Again
                     </button>
                     <button
                       type="button"

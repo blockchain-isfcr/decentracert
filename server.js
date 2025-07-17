@@ -22,6 +22,26 @@ const upload = multer({
   }
 });
 
+// Retry function for IPFS uploads
+const retryUpload = async (uploadFunction, maxRetries = 3, delay = 2000) => {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 Attempt ${attempt}/${maxRetries} to upload to IPFS...`);
+      return await uploadFunction();
+    } catch (error) {
+      console.error(`❌ Attempt ${attempt} failed:`, error.message);
+      
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, delay));
+      console.log(`⏳ Retrying in ${delay}ms...`);
+    }
+  }
+};
+
 // API Routes - these must come BEFORE static file serving
 app.post('/api/upload-ipfs', upload.single('file'), async (req, res) => {
   console.log('📤 IPFS upload request received');
@@ -55,24 +75,31 @@ app.post('/api/upload-ipfs', upload.single('file'), async (req, res) => {
 
     console.log('🔐 Using PINATA_JWT:', process.env.PINATA_JWT ? 'Present' : 'Missing');
 
-    // Upload to Pinata using server-side secrets
-    const response = await axios.post(
-      'https://api.pinata.cloud/pinning/pinFileToIPFS',
-      formData,
-      {
-        maxBodyLength: 'Infinity',
-        maxContentLength: 'Infinity',
-        headers: {
-          'Authorization': `Bearer ${process.env.PINATA_JWT}`,
-          ...formData.getHeaders(),
-        },
-        timeout: 30000, // 30 second timeout
-      }
-    );
+    // Upload function with retry logic
+    const uploadToPinata = async () => {
+      const response = await axios.post(
+        'https://api.pinata.cloud/pinning/pinFileToIPFS',
+        formData,
+        {
+          maxBodyLength: 'Infinity',
+          maxContentLength: 'Infinity',
+          headers: {
+            'Authorization': `Bearer ${process.env.PINATA_JWT}`,
+            ...formData.getHeaders(),
+          },
+          timeout: 60000, // 60 second timeout
+        }
+      );
 
-    if (!response.data || !response.data.IpfsHash) {
-      throw new Error('Invalid response from Pinata API');
-    }
+      if (!response.data || !response.data.IpfsHash) {
+        throw new Error('Invalid response from Pinata API');
+      }
+
+      return response;
+    };
+
+    // Attempt upload with retries
+    const response = await retryUpload(uploadToPinata);
 
     console.log('✅ IPFS upload successful:', response.data.IpfsHash);
     res.json({ ipfsHash: response.data.IpfsHash });
@@ -80,13 +107,21 @@ app.post('/api/upload-ipfs', upload.single('file'), async (req, res) => {
     console.error('❌ Error uploading to IPFS:', error.message);
     console.error('❌ Error details:', error.response?.data || error.stack);
     
-    if (error.response?.status === 401) {
-      res.status(401).json({ error: 'Pinata authentication failed. Please check your JWT token.' });
+    let errorMessage = 'Failed to upload to IPFS';
+    
+    if (error.code === 'ECONNRESET' || error.message.includes('ECONNRESET')) {
+      errorMessage = 'Network connection issue with IPFS service. Please try again in a few minutes.';
+    } else if (error.response?.status === 401) {
+      errorMessage = 'Pinata authentication failed. Please check your JWT token.';
     } else if (error.response?.status === 413) {
-      res.status(413).json({ error: 'File too large. Please use a smaller file.' });
+      errorMessage = 'File too large. Please use a smaller file.';
+    } else if (error.code === 'ETIMEDOUT' || error.message.includes('timeout')) {
+      errorMessage = 'Upload timed out. Please try again.';
     } else {
-      res.status(500).json({ error: `Failed to upload to IPFS: ${error.message}` });
+      errorMessage = `Upload failed: ${error.message}`;
     }
+    
+    res.status(500).json({ error: errorMessage });
   }
 });
 
@@ -102,22 +137,29 @@ app.post('/api/upload-metadata', async (req, res) => {
 
     console.log('🔐 Using PINATA_JWT:', process.env.PINATA_JWT ? 'Present' : 'Missing');
 
-    // Upload metadata to Pinata
-    const response = await axios.post(
-      'https://api.pinata.cloud/pinning/pinJSONToIPFS',
-      metadata,
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.PINATA_JWT}`,
-          'Content-Type': 'application/json',
-        },
-        timeout: 30000, // 30 second timeout
-      }
-    );
+    // Upload function with retry logic
+    const uploadMetadataToPinata = async () => {
+      const response = await axios.post(
+        'https://api.pinata.cloud/pinning/pinJSONToIPFS',
+        metadata,
+        {
+          headers: {
+            'Authorization': `Bearer ${process.env.PINATA_JWT}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 60000, // 60 second timeout
+        }
+      );
 
-    if (!response.data || !response.data.IpfsHash) {
-      throw new Error('Invalid response from Pinata API');
-    }
+      if (!response.data || !response.data.IpfsHash) {
+        throw new Error('Invalid response from Pinata API');
+      }
+
+      return response;
+    };
+
+    // Attempt upload with retries
+    const response = await retryUpload(uploadMetadataToPinata);
 
     console.log('✅ Metadata upload successful:', response.data.IpfsHash);
     res.json({ ipfsHash: response.data.IpfsHash });
@@ -125,11 +167,19 @@ app.post('/api/upload-metadata', async (req, res) => {
     console.error('❌ Error uploading metadata to IPFS:', error.message);
     console.error('❌ Error details:', error.response?.data || error.stack);
     
-    if (error.response?.status === 401) {
-      res.status(401).json({ error: 'Pinata authentication failed. Please check your JWT token.' });
+    let errorMessage = 'Failed to upload metadata to IPFS';
+    
+    if (error.code === 'ECONNRESET' || error.message.includes('ECONNRESET')) {
+      errorMessage = 'Network connection issue with IPFS service. Please try again in a few minutes.';
+    } else if (error.response?.status === 401) {
+      errorMessage = 'Pinata authentication failed. Please check your JWT token.';
+    } else if (error.code === 'ETIMEDOUT' || error.message.includes('timeout')) {
+      errorMessage = 'Upload timed out. Please try again.';
     } else {
-      res.status(500).json({ error: `Failed to upload metadata to IPFS: ${error.message}` });
+      errorMessage = `Upload failed: ${error.message}`;
     }
+    
+    res.status(500).json({ error: errorMessage });
   }
 });
 

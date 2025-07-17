@@ -853,7 +853,7 @@ ${certificates.map(cert => `✅ ${cert.metadata.name || cert.contractName}`).joi
               {/* Add Custom Contract */}
               <div className="card mb-4">
                 <div className="card-header">
-                  <h6 className="mb-0">➕ Add Certificate Contract</h6>
+                  <h6 style={{ color: '#efe8ff' }} className="mb-0">➕ Add Certificate Contract</h6>
                 </div>
                 <div className="card-body">
                   <div className="input-group mb-3">
@@ -874,14 +874,14 @@ ${certificates.map(cert => `✅ ${cert.metadata.name || cert.contractName}`).joi
                   </div>
 
                   <div className="alert alert-info">
-                    <h6>💡 How to find your certificates:</h6>
-                    <ul className="mb-2">
+                    <h6 style={{ color: '#ffffff' }}>💡 How to find your certificates:</h6>
+                    <ul className="mb-2" style={{ color: '#ffffff' }}>
                       <li><strong>Automatic Discovery:</strong> Click "Automatically Discover" above - scans your transaction history</li>
                       <li><strong>From Organizer:</strong> Get contract address from certificate organizer</li>
                       <li><strong>From Email/Download:</strong> Check certificate claim emails or downloaded files</li>
                       <li><strong>From Etherscan:</strong> Look at your wallet's transaction history</li>
                     </ul>
-                    <p className="mb-0"><strong>Note:</strong> The automatic discovery scans your blockchain transaction history to find certificate contracts you've interacted with.</p>
+                    <p className="mb-0" style={{ color: '#ffffff' }}><strong>Note:</strong> The automatic discovery scans your blockchain transaction history to find certificate contracts you've interacted with.</p>
                   </div>
                 </div>
               </div>
@@ -901,7 +901,7 @@ ${certificates.map(cert => `✅ ${cert.metadata.name || cert.contractName}`).joi
               {certificates.length > 0 && (
                 <div className="card mb-4">
                   <div className="card-header">
-                    <h6 className="mb-0">📤 Share Your Certificate Portfolio</h6>
+                    <h6 style={{ color: '#ffffff' }} className="mb-0">📤 Share Your Certificate Portfolio</h6>
                   </div>
                   <div className="card-body">
                     <div className="row">
@@ -925,9 +925,9 @@ ${certificates.map(cert => `✅ ${cert.metadata.name || cert.contractName}`).joi
                       </div>
                       <div className="col-md-6">
                         <div className="alert alert-info mb-0">
-                          <h6>🎓 Your Portfolio</h6>
-                          <p className="mb-1"><strong>{certificates.length}</strong> verified certificate{certificates.length > 1 ? 's' : ''}</p>
-                          <p className="mb-0">All permanently bound to your wallet</p>
+                          <h6 style={{ color: '#ffffff' }}>🎓 Your Portfolio</h6>
+                          <p className="mb-1" style={{ color: '#ffffff' }}><strong>{certificates.length}</strong> verified certificate{certificates.length > 1 ? 's' : ''}</p>
+                          <p className="mb-0" style={{ color: '#ffffff' }}>All permanently bound to your wallet</p>
                         </div>
                       </div>
                     </div>
@@ -938,33 +938,33 @@ ${certificates.map(cert => `✅ ${cert.metadata.name || cert.contractName}`).joi
               {/* Certificates Display */}
               {certificates.length > 0 && (
                 <div className="certificates-grid">
-                  <h5 className="mb-3">Your Soulbound Certificates:</h5>
+                  <h5 style={{ color: '#ffffff' }} className="mb-3">Your Soulbound Certificates:</h5>
                   {certificates.map((cert, index) => (
                     <div key={index} className="card mb-4 border-primary">
                       <div className="card-body">
                         <div className="row">
                           <div className="col-md-8">
-                            <h5 className="card-title">
+                            <h5 className="card-title" style={{ color: '#ffffff' }}>
                               🎓 {cert.metadata.name || cert.contractName}
                             </h5>
-                            <p className="card-text">
+                            <p className="card-text" style={{ color: '#ffffff' }}>
                               {cert.metadata.description || 'Soulbound Certificate'}
                             </p>
                             
                             <div className="certificate-info">
-                              <p className="mb-1"><strong>Issuer:</strong> {cert.contractName} ({cert.contractSymbol})</p>
-                              <p className="mb-1"><strong>Token ID:</strong> {cert.tokenId}</p>
-                              <p className="mb-1"><strong>Issue Date:</strong> {
+                              <p className="mb-1" style={{ color: '#ffffff' }}><strong>Issuer:</strong> {cert.contractName} ({cert.contractSymbol})</p>
+                              <p className="mb-1" style={{ color: '#ffffff' }}><strong>Token ID:</strong> {cert.tokenId}</p>
+                              <p className="mb-1" style={{ color: '#ffffff' }}><strong>Issue Date:</strong> {
                                 cert.metadata.attributes?.find(attr => attr.trait_type === 'Issue Date')?.value || 'Not specified'
                               }</p>
-                              <p className="mb-1"><strong>Status:</strong> 
+                              <p className="mb-1" style={{ color: '#ffffff' }}><strong>Status:</strong> 
                                 <span className="badge bg-success ms-2">VERIFIED ✅</span>
                               </p>
                             </div>
 
                             {/* Sharing Options */}
                             <div className="sharing-options mt-3">
-                              <h6>📤 Share Certificate:</h6>
+                              <h6 style={{ color: '#ffffff' }}>📤 Share Certificate:</h6>
                               <div className="btn-group-vertical d-grid gap-2">
                                 <button 
                                   className="btn btn-linkedin"
@@ -1038,9 +1038,9 @@ ${certificates.map(cert => `✅ ${cert.metadata.name || cert.contractName}`).joi
 
               {certificates.length === 0 && !loading && (
                 <div className="alert alert-info text-center">
-                  <h5>🔍 No Certificates Found</h5>
-                  <p>Add certificate contract addresses above to discover your certificates.</p>
-                  <p className="mb-0">Your certificates will appear here once contracts are added.</p>
+                  <h5 style={{ color: '#ffffff' }}>🔍 No Certificates Found</h5>
+                  <p style={{ color: '#ffffff' }}>Add certificate contract addresses above to discover your certificates.</p>
+                  <p className="mb-0" style={{ color: '#ffffff' }}>Your certificates will appear here once contracts are added.</p>
                 </div>
               )}
             </div>

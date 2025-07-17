@@ -770,6 +770,28 @@ export const createCertificateMetadata = async (eventData, designResult, recipie
 };
 
 /**
+ * Retry function for API calls
+ */
+const retryApiCall = async (apiCall, maxRetries = 3, delay = 2000) => {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 Attempt ${attempt}/${maxRetries} to upload to IPFS...`);
+      return await apiCall();
+    } catch (error) {
+      console.error(`❌ Attempt ${attempt} failed:`, error.message);
+      
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, delay));
+      console.log(`⏳ Retrying in ${delay}ms...`);
+    }
+  }
+};
+
+/**
  * Upload certificate design and metadata to IPFS
  */
 export const uploadCertificateToIPFS = async (metadata, imageDataUrl = null) => {
@@ -798,57 +820,65 @@ export const uploadCertificateToIPFS = async (metadata, imageDataUrl = null) => 
 
     console.log('📤 Sending to server API...');
     
-    // Upload image to IPFS via server
-    const uploadResponse = await fetch('/api/upload-ipfs', {
-      method: 'POST',
-      body: formData,
-    });
+    // Upload image to IPFS via server with retry
+    const uploadImage = async () => {
+      const uploadResponse = await fetch('/api/upload-ipfs', {
+        method: 'POST',
+        body: formData,
+      });
 
-    if (!uploadResponse.ok) {
-      const errorText = await uploadResponse.text();
-      console.error('❌ Server response error:', errorText);
-      
-      let errorMessage = 'Failed to upload certificate to IPFS';
-      try {
-        const errorData = JSON.parse(errorText);
-        errorMessage = errorData.error || errorMessage;
-      } catch (parseError) {
-        console.error('❌ Could not parse error response:', parseError);
-        errorMessage = `Server error: ${uploadResponse.status} ${uploadResponse.statusText}`;
+      if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        console.error('❌ Server response error:', errorText);
+        
+        let errorMessage = 'Failed to upload certificate to IPFS';
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorMessage;
+        } catch (parseError) {
+          console.error('❌ Could not parse error response:', parseError);
+          errorMessage = `Server error: ${uploadResponse.status} ${uploadResponse.statusText}`;
+        }
+        
+        throw new Error(errorMessage);
       }
-      
-      throw new Error(errorMessage);
-    }
 
-    const uploadResult = await uploadResponse.json();
+      return await uploadResponse.json();
+    };
+
+    const uploadResult = await retryApiCall(uploadImage);
     console.log('✅ Image uploaded successfully:', uploadResult.ipfsHash);
 
-    // Now upload metadata to IPFS
-    const metadataResponse = await fetch('/api/upload-metadata', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(metadata),
-    });
+    // Now upload metadata to IPFS with retry
+    const uploadMetadataToIPFS = async () => {
+      const metadataResponse = await fetch('/api/upload-metadata', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(metadata),
+      });
 
-    if (!metadataResponse.ok) {
-      const errorText = await metadataResponse.text();
-      console.error('❌ Metadata upload error:', errorText);
-      
-      let errorMessage = 'Failed to upload metadata to IPFS';
-      try {
-        const errorData = JSON.parse(errorText);
-        errorMessage = errorData.error || errorMessage;
-      } catch (parseError) {
-        console.error('❌ Could not parse error response:', parseError);
-        errorMessage = `Server error: ${metadataResponse.status} ${metadataResponse.statusText}`;
+      if (!metadataResponse.ok) {
+        const errorText = await metadataResponse.text();
+        console.error('❌ Metadata upload error:', errorText);
+        
+        let errorMessage = 'Failed to upload metadata to IPFS';
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorMessage;
+        } catch (parseError) {
+          console.error('❌ Could not parse error response:', parseError);
+          errorMessage = `Server error: ${metadataResponse.status} ${metadataResponse.statusText}`;
+        }
+        
+        throw new Error(errorMessage);
       }
-      
-      throw new Error(errorMessage);
-    }
 
-    const metadataResult = await metadataResponse.json();
+      return await metadataResponse.json();
+    };
+
+    const metadataResult = await retryApiCall(uploadMetadataToIPFS);
     console.log('✅ Metadata uploaded successfully:', metadataResult.ipfsHash);
 
     return {
@@ -861,9 +891,20 @@ export const uploadCertificateToIPFS = async (metadata, imageDataUrl = null) => 
 
   } catch (error) {
     console.error('Error uploading to IPFS:', error);
+    
+    // Provide user-friendly error messages
+    let userMessage = error.message;
+    if (error.message.includes('ECONNRESET') || error.message.includes('Network connection issue')) {
+      userMessage = 'Network connection issue with IPFS service. Please try again in a few minutes.';
+    } else if (error.message.includes('timeout')) {
+      userMessage = 'Upload timed out. Please try again.';
+    } else if (error.message.includes('Failed to upload')) {
+      userMessage = 'Upload failed. Please check your internet connection and try again.';
+    }
+    
     return {
       success: false,
-      error: error.message
+      error: userMessage
     };
   }
 };

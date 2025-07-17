@@ -405,32 +405,47 @@ const StudentPortal = ({ account, provider, signer, connectWallet }) => {
     setSuccessMsg('');
 
     try {
-      const contract = new ethers.Contract(viewerContractAddress, [
-        "function balanceOf(address) view returns (uint256)",
-        "function tokenOfOwnerByIndex(address, uint256) view returns (uint256)",
-        "function tokenURI(uint256) view returns (string)"
-      ], provider);
+      // Use the same contract ABI as the verifier for consistency
+      const contractABI = [
+        "function hasSoulboundCertificate(address) view returns (bool)",
+        "function soulboundOwnerOf(uint256) view returns (address)",
+        "function getSoulboundCertificateDetails(address) view returns (bool exists, uint256 tokenId, string memory uri)",
+        "function tokenURI(uint256) view returns (string)",
+        "function name() view returns (string)",
+        "function symbol() view returns (string)",
+        "function totalSupply() view returns (uint256)",
+        "function balanceOf(address) view returns (uint256)"
+      ];
 
-      const balance = await contract.balanceOf(account);
-      console.log('Balance:', balance.toString());
+      const contract = new ethers.Contract(viewerContractAddress, contractABI, provider);
 
-      const certificates = [];
-      for (let i = 0; i < balance; i++) {
-        try {
-          const tokenId = await contract.tokenOfOwnerByIndex(account, i);
-          const tokenURI = await contract.tokenURI(tokenId);
-          certificates.push({
-            tokenId: tokenId.toString(),
-            tokenURI: tokenURI
-          });
-        } catch (error) {
-          console.error(`Error fetching token ${i}:`, error);
-        }
+      // Check if user has a soulbound certificate
+      const hasCertificate = await contract.hasSoulboundCertificate(account);
+      
+      if (!hasCertificate) {
+        setMyCertificates([]);
+        setShowViewer(true);
+        setSuccessMsg('No certificates found in your wallet for this contract.');
+        return;
       }
 
-      setMyCertificates(certificates);
-      setShowViewer(true);
-      setSuccessMsg(`Found ${certificates.length} certificate(s) in your wallet!`);
+      // Get certificate details
+      const [exists, tokenId, uri] = await contract.getSoulboundCertificateDetails(account);
+      
+      if (exists) {
+        const certificates = [{
+          tokenId: tokenId.toString(),
+          tokenURI: uri
+        }];
+        
+        setMyCertificates(certificates);
+        setShowViewer(true);
+        setSuccessMsg(`Found ${certificates.length} certificate(s) in your wallet!`);
+      } else {
+        setMyCertificates([]);
+        setShowViewer(true);
+        setSuccessMsg('No certificates found in your wallet for this contract.');
+      }
 
     } catch (error) {
       console.error('Error fetching certificates:', error);
@@ -783,7 +798,44 @@ const StudentPortal = ({ account, provider, signer, connectWallet }) => {
                       <p><strong>Name:</strong> {tokenURIDetails.name || 'Not specified'}</p>
                       <p><strong>Description:</strong> {tokenURIDetails.description || 'Not specified'}</p>
                       {tokenURIDetails.image && (
-                        <p><strong>Image:</strong> <a href={tokenURIDetails.image} target="_blank" rel="noopener noreferrer">{tokenURIDetails.image}</a></p>
+                        <div>
+                          <p><strong>Image:</strong></p>
+                          <div className="certificate-image-preview mb-3">
+                            {tokenURIDetails.image.startsWith('data:image/') ? (
+                              <img 
+                                src={tokenURIDetails.image} 
+                                alt="Certificate Preview" 
+                                className="img-fluid rounded border"
+                                style={{ maxHeight: '300px', maxWidth: '100%' }}
+                              />
+                            ) : tokenURIDetails.image.startsWith('ipfs://') ? (
+                              <img 
+                                src={tokenURIDetails.image.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')} 
+                                alt="Certificate Preview" 
+                                className="img-fluid rounded border"
+                                style={{ maxHeight: '300px', maxWidth: '100%' }}
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                  e.target.nextSibling.style.display = 'block';
+                                }}
+                              />
+                            ) : (
+                              <img 
+                                src={tokenURIDetails.image} 
+                                alt="Certificate Preview" 
+                                className="img-fluid rounded border"
+                                style={{ maxHeight: '300px', maxWidth: '100%' }}
+                                onError={(e) => {
+                                  e.target.style.display = 'none';
+                                  e.target.nextSibling.style.display = 'block';
+                                }}
+                              />
+                            )}
+                            <div style={{ display: 'none' }} className="text-muted">
+                              <small style={{ color: '#ffffff' }}>Image preview not available. <a href={tokenURIDetails.image} target="_blank" rel="noopener noreferrer" style={{ color: '#60a5fa' }}>View original</a></small>
+                            </div>
+                          </div>
+                        </div>
                       )}
                       {tokenURIDetails.attributes && tokenURIDetails.attributes.length > 0 && (
                         <div>
@@ -914,7 +966,33 @@ const StudentPortal = ({ account, provider, signer, connectWallet }) => {
                     >
                       <div className="certificate-info">
                         <span className="certificate-id body-font">Token ID: {cert.tokenId}</span>
-                        <span className="certificate-uri body-font">URI: {cert.tokenURI}</span>
+                        <span className="certificate-uri body-font">
+                          URI: {cert.tokenURI.startsWith('ipfs://') 
+                            ? `ipfs://${cert.tokenURI.split('/').pop()}`
+                            : cert.tokenURI
+                          }
+                        </span>
+                        {/* Certificate Image Preview */}
+                        <div className="certificate-image-preview mt-2">
+                          {cert.tokenURI.startsWith('ipfs://') ? (
+                            <img 
+                              src={cert.tokenURI.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')} 
+                              alt="Certificate Preview" 
+                              className="img-fluid rounded border"
+                              style={{ maxHeight: '150px', maxWidth: '100%' }}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                              }}
+                            />
+                          ) : cert.tokenURI.startsWith('data:image/') ? (
+                            <img 
+                              src={cert.tokenURI} 
+                              alt="Certificate Preview" 
+                              className="img-fluid rounded border"
+                              style={{ maxHeight: '150px', maxWidth: '100%' }}
+                            />
+                          ) : null}
+                        </div>
                               </div>
                       <div className="certificate-actions">
                         <motion.button
