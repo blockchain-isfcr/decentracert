@@ -43,15 +43,17 @@
     "recharts": "^3.0.0"
   },
   "devDependencies": {
-    "@craco/craco": "^7.1.0",
+    "@craco/craco": "^5.9.0",
     "@nomicfoundation/hardhat-toolbox": "^2.0.2",
     "concurrently": "^8.2.2",
     "crypto-browserify": "^3.12.1",
     "hardhat": "^2.14.1",
     "process": "^0.11.10",
-    "react-scripts": "5.0.1",
+    "react-scripts": "^5.0.1",
     "stream-browserify": "^3.0.0",
-    "util": "^0.12.5"
+    "util": "^0.12.5",
+    "webpack": "^5.101.3",
+    "webpack-cli": "^6.0.1"
   },
   "proxy": "http://localhost:3001",
   "browserslist": {

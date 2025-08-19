@@ -27,6 +27,7 @@ yarn-error.log*
 /artifacts
 typechain
 typechain-types
+/src/artifacts/
 
 # Truffle
 .tern-port
