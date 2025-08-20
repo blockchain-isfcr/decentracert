@@ -63,7 +63,7 @@ function App() {
           setError("Failed to connect to Ethereum network");
         }
       } else {
-        setError("MetaMask is not installed. Please install MetaMask to use this app.");
+        setError("MetaMask is not installed. install MetaMask to use this app.");
       }
     };
 
